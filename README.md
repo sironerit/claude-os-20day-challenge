@@ -1,43 +1,43 @@
-# Claude OS - 70日チャレンジプロジェクト
+# Claude OS - 70-Day Challenge Project
 
-## 🚀 プロジェクト概要
+## 🚀 Project Overview
 
-**Claude OS** - Claude Codeで一から作る完全自作OS
-- **期間**: 70日間（2時間/日 = 140時間）
-- **開始日**: 2025年6月9日
-- **目標**: フルOSの完成（GUI、マルチタスク、ネットワーク）
-- **言語**: C + Assembly (x86)
+**Claude OS** - Building a complete operating system from scratch with Claude Code
+- **Duration**: 70 days (2 hours/day = 140 hours total)
+- **Start Date**: June 9, 2025
+- **Goal**: Complete OS with GUI, multitasking, and networking
+- **Languages**: C + x86 Assembly
 
-## 📅 開発スケジュール
+## 📅 Development Schedule
 
-### Phase 1: 基盤構築 (Day 1-28)
-- **Week 1-2**: ブートローダー + 基本カーネル
-- **Week 3-4**: メモリ管理・基本システム
+### Phase 1: Foundation (Day 1-28)
+- **Week 1-2**: Bootloader + Basic kernel
+- **Week 3-4**: Memory management & basic systems
 
-### Phase 2: 中核機能 (Day 29-56)  
-- **Week 5-6**: ファイルシステム
-- **Week 7-8**: プロセス管理・マルチタスク
+### Phase 2: Core Features (Day 29-56)  
+- **Week 5-6**: File system
+- **Week 7-8**: Process management & multitasking
 
-### Phase 3: 高度機能 (Day 57-70)
-- **Week 9-10**: GUI・ネットワーク・完成
+### Phase 3: Advanced Features (Day 57-70)
+- **Week 9-10**: GUI, networking & completion
 
-## 🛠️ 技術スタック
+## 🛠️ Tech Stack
 
-- **アーキテクチャ**: x86 (32bit)
-- **言語**: C + x86 Assembly
-- **ビルドツール**: GCC, NASM, Make
-- **エミュレータ**: QEMU
-- **デバッガ**: GDB
+- **Architecture**: x86 (32-bit)
+- **Languages**: C + x86 Assembly
+- **Build Tools**: GCC, NASM, Make
+- **Emulator**: QEMU
+- **Debugger**: GDB
 
-## 📊 Day 1 進捗
+## 📊 Day 1 Progress
 
-- [x] プロジェクトディレクトリ作成
-- [x] README作成
-- [ ] プロジェクト構造作成
-- [ ] Makefile作成
-- [ ] GitHubリポジトリ作成
+- [x] Project directory created
+- [x] README created
+- [ ] Project structure setup
+- [ ] Makefile creation
+- [ ] GitHub repository setup
 
 ---
 
-**開発者**: Claude Code + ユーザー  
-**スローガン**: "AI時代の自作OS"
+**Developer**: Claude Code + Human  
+**Motto**: "Building an OS in the AI Era"
