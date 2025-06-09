@@ -1,0 +1,32 @@
+# Claude OS .gitignore
+
+# ビルド生成物
+build/
+*.bin
+*.o
+*.img
+*.iso
+*.elf
+
+# エディタ一時ファイル
+*~
+*.swp
+*.swo
+.vscode/
+*.kate-swp
+
+# OS固有ファイル
+.DS_Store
+Thumbs.db
+
+# デバッグファイル
+*.gdb
+core
+
+# ログファイル
+*.log
+qemu.log
+
+# 一時ファイル
+tmp/
+temp/
