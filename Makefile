@@ -41,17 +41,18 @@ $(BOOTLOADER_PROTECTED): $(BUILD_DIR) $(BOOT_DIR)/boot_protected.asm
 	@echo "Building protected mode bootloader..."
 	$(AS) -f bin $(BOOT_DIR)/boot_protected.asm -o $(BOOTLOADER_PROTECTED)
 
-# カーネルビルド（Day 8-14で実装予定）
-$(KERNEL): $(BUILD_DIR)
-	@echo "Day 8-14でカーネルを実装します"
-	# $(CC) $(CFLAGS) $(KERNEL_DIR)/kernel.c -o $(BUILD_DIR)/kernel.o
-	# $(LD) $(LDFLAGS) -o $(KERNEL) $(BUILD_DIR)/kernel.o
+# カーネルビルド（Day 3実装）
+$(KERNEL): $(BUILD_DIR) $(KERNEL_DIR)/kernel.c $(KERNEL_DIR)/entry.asm
+	@echo "Building kernel..."
+	$(AS) $(ASFLAGS) $(KERNEL_DIR)/entry.asm -o $(BUILD_DIR)/entry.o
+	$(CC) $(CFLAGS) $(KERNEL_DIR)/kernel.c -o $(BUILD_DIR)/kernel.o
+	$(LD) $(LDFLAGS) -o $(KERNEL) $(BUILD_DIR)/entry.o $(BUILD_DIR)/kernel.o
 
-# OSイメージ作成
+# OSイメージ作成（Day 3: ブートローダー+カーネル統合）
 $(OS_IMAGE): $(BOOTLOADER) $(KERNEL)
-	@echo "Day 1: プロジェクト構造作成完了"
-	@echo "次回はブートローダー実装から開始します"
-	touch $(OS_IMAGE)
+	@echo "Creating OS image with bootloader and kernel..."
+	dd if=$(BOOTLOADER) of=$(OS_IMAGE) bs=512 count=1
+	dd if=$(KERNEL) of=$(OS_IMAGE) bs=512 seek=1
 
 # QEMU実行（基本ブートローダー）
 run: $(BOOTLOADER)
@@ -60,6 +61,14 @@ run: $(BOOTLOADER)
 # QEMU実行（プロテクトモード）
 run-protected: $(BOOTLOADER_PROTECTED)
 	qemu-system-i386 -drive file=$(BOOTLOADER_PROTECTED),format=raw -m 16M
+
+# QEMU実行（カーネル単体テスト）
+run-kernel: $(KERNEL)
+	qemu-system-i386 -kernel $(KERNEL) -m 16M
+
+# QEMU実行（完全なOSイメージ）
+run-os: $(OS_IMAGE)
+	qemu-system-i386 -drive file=$(OS_IMAGE),format=raw -m 16M
 
 # ISO作成
 iso: $(ISO_IMAGE)
