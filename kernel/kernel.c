@@ -2,6 +2,8 @@
 // Day 3: Core kernel with VGA text mode output
 
 #include "kernel.h"
+#include "gdt.h"
+#include "idt.h"
 
 // VGA Text Mode Constants
 #define VGA_WIDTH 80
@@ -114,6 +116,12 @@ void kernel_panic(const char* message) {
     }
 }
 
+// Initialize descriptor tables (GDT, IDT)
+void init_descriptor_tables(void) {
+    gdt_init();
+    idt_init();
+}
+
 // Main kernel entry point
 void kernel_main(void) {
     // Initialize terminal
@@ -121,19 +129,28 @@ void kernel_main(void) {
     
     // Display welcome message
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
-    terminal_writestring("ClaudeOS v0.1 - Day 3 Kernel\n");
+    terminal_writestring("ClaudeOS v0.1 - Day 4 Kernel\n");
     terminal_writestring("=================================\n\n");
     
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
     terminal_writestring("Kernel successfully loaded!\n");
     terminal_writestring("Basic VGA text mode initialized.\n");
-    terminal_writestring("Memory management: Not implemented\n");
-    terminal_writestring("Process management: Not implemented\n");
-    terminal_writestring("File system: Not implemented\n\n");
+    
+    // Initialize hardware abstraction layer
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK));
+    terminal_writestring("Initializing GDT & IDT...\n");
+    init_descriptor_tables();
+    terminal_writestring("GDT & IDT initialized successfully!\n");
+    
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+    terminal_writestring("Interrupts enabled. System ready!\n\n");
+    
+    // Enable interrupts
+    asm volatile ("sti");
     
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BROWN, VGA_COLOR_BLACK));
-    terminal_writestring("Status: Basic kernel running\n");
-    terminal_writestring("Next: Implement GDT, IDT, and interrupts\n\n");
+    terminal_writestring("Status: Full kernel with interrupts running\n");
+    terminal_writestring("Timer and keyboard interrupts active\n\n");
     
     terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
     terminal_writestring("Kernel is now idle. Use Ctrl+C to exit QEMU.\n");

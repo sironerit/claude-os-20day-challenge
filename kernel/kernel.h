@@ -15,7 +15,15 @@ typedef unsigned int size_t;
 void kernel_main(void);
 void terminal_initialize(void);
 void terminal_writestring(const char* data);
+void terminal_setcolor(uint8_t color);
 void kernel_panic(const char* message);
+
+// System initialization
+void init_descriptor_tables(void);
+
+// Interrupt handlers
+void timer_callback(void);
+void keyboard_callback(void);
 
 // Assembly helper functions (to be implemented)
 extern void outb(uint16_t port, uint8_t data);

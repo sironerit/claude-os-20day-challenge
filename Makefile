@@ -41,12 +41,19 @@ $(BOOTLOADER_PROTECTED): $(BUILD_DIR) $(BOOT_DIR)/boot_protected.asm
 	@echo "Building protected mode bootloader..."
 	$(AS) -f bin $(BOOT_DIR)/boot_protected.asm -o $(BOOTLOADER_PROTECTED)
 
-# カーネルビルド（Day 3実装）
-$(KERNEL): $(BUILD_DIR) $(KERNEL_DIR)/kernel.c $(KERNEL_DIR)/entry.asm
-	@echo "Building kernel..."
+# カーネルビルド（Day 4実装: GDT + IDT + 割り込み）
+$(KERNEL): $(BUILD_DIR) $(KERNEL_DIR)/kernel.c $(KERNEL_DIR)/entry.asm $(KERNEL_DIR)/gdt.c $(KERNEL_DIR)/gdt_flush.asm $(KERNEL_DIR)/idt.c $(KERNEL_DIR)/idt_flush.asm $(KERNEL_DIR)/isr.asm $(KERNEL_DIR)/isr.c $(KERNEL_DIR)/io.asm
+	@echo "Building kernel with GDT, IDT, and interrupts..."
 	$(AS) $(ASFLAGS) $(KERNEL_DIR)/entry.asm -o $(BUILD_DIR)/entry.o
+	$(AS) $(ASFLAGS) $(KERNEL_DIR)/gdt_flush.asm -o $(BUILD_DIR)/gdt_flush.o
+	$(AS) $(ASFLAGS) $(KERNEL_DIR)/idt_flush.asm -o $(BUILD_DIR)/idt_flush.o
+	$(AS) $(ASFLAGS) $(KERNEL_DIR)/isr.asm -o $(BUILD_DIR)/isr.o
+	$(AS) $(ASFLAGS) $(KERNEL_DIR)/io.asm -o $(BUILD_DIR)/io.o
 	$(CC) $(CFLAGS) $(KERNEL_DIR)/kernel.c -o $(BUILD_DIR)/kernel.o
-	$(LD) $(LDFLAGS) -o $(KERNEL) $(BUILD_DIR)/entry.o $(BUILD_DIR)/kernel.o
+	$(CC) $(CFLAGS) $(KERNEL_DIR)/gdt.c -o $(BUILD_DIR)/gdt.o
+	$(CC) $(CFLAGS) $(KERNEL_DIR)/idt.c -o $(BUILD_DIR)/idt.o
+	$(CC) $(CFLAGS) $(KERNEL_DIR)/isr.c -o $(BUILD_DIR)/isr_c.o
+	$(LD) $(LDFLAGS) -o $(KERNEL) $(BUILD_DIR)/entry.o $(BUILD_DIR)/kernel.o $(BUILD_DIR)/gdt.o $(BUILD_DIR)/gdt_flush.o $(BUILD_DIR)/idt.o $(BUILD_DIR)/idt_flush.o $(BUILD_DIR)/isr.o $(BUILD_DIR)/isr_c.o $(BUILD_DIR)/io.o
 
 # OSイメージ作成（Day 3: ブートローダー+カーネル統合）
 $(OS_IMAGE): $(BOOTLOADER) $(KERNEL)
