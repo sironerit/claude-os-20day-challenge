@@ -34,3 +34,6 @@ section .bss
 stack_bottom:
     resb 16384  ; 16 KiB stack
 stack_top:
+
+; GNU stack note section (prevents executable stack warning)
+section .note.GNU-stack noalloc noexec nowrite progbits
