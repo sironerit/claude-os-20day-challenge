@@ -1,8 +1,9 @@
-// ClaudeOS Interrupt Service Routines - Day 3
-// C implementation of exception handlers
+// ClaudeOS Interrupt Service Routines - Day 4
+// C implementation of exception and IRQ handlers
 
 #include "kernel.h"
 #include "types.h"
+#include "timer.h"
 
 // VGA Color Codes (for exception display)
 typedef enum {
@@ -82,5 +83,28 @@ void isr_handler(struct registers regs) {
     // Halt the system
     while (1) {
         asm volatile ("hlt");
+    }
+}
+
+// IRQ handler function
+void irq_handler(struct registers regs) {
+    // Check if this is a spurious interrupt from the slave PIC
+    if (regs.int_no >= 40) {
+        // Send EOI to slave PIC
+        // (We'll implement this when we add PIC functions)
+    }
+    
+    // Handle specific IRQs
+    switch (regs.int_no) {
+        case 32:  // IRQ0 - Timer
+            timer_handler();
+            break;
+        case 33:  // IRQ1 - Keyboard
+            // Keyboard handler will be implemented later
+            break;
+        default:
+            // Unknown IRQ - just send EOI
+            // pic_send_eoi(regs.int_no - 32);
+            break;
     }
 }

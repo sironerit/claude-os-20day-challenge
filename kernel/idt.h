@@ -64,4 +64,22 @@ extern void isr12(void);  // Stack Fault
 extern void isr13(void);  // General Protection
 extern void isr14(void);  // Page Fault
 
+// IRQ handlers
+extern void irq0(void);   // Timer
+extern void irq1(void);   // Keyboard
+extern void irq2(void);   // Cascade
+extern void irq3(void);   // Serial 2
+extern void irq4(void);   // Serial 1
+extern void irq5(void);   // Parallel 2
+extern void irq6(void);   // Floppy
+extern void irq7(void);   // Parallel 1
+extern void irq8(void);   // RTC
+extern void irq9(void);   // Free
+extern void irq10(void);  // Free
+extern void irq11(void);  // Free
+extern void irq12(void);  // Mouse
+extern void irq13(void);  // FPU
+extern void irq14(void);  // ATA 1
+extern void irq15(void);  // ATA 2
+
 #endif // IDT_H

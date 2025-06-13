@@ -1,9 +1,11 @@
-// ClaudeOS Kernel - Day 3 Implementation
-// GDT and IDT integration
+// ClaudeOS Kernel - Day 4 Implementation
+// Hardware drivers integration
 
 #include "kernel.h"
 #include "gdt.h"
 #include "idt.h"
+#include "pic.h"
+#include "timer.h"
 
 // VGA Text Mode Constants
 #define VGA_WIDTH 80
@@ -29,6 +31,7 @@ typedef enum {
     VGA_COLOR_LIGHT_BROWN = 14,
     VGA_COLOR_WHITE = 15,
     VGA_COLOR_YELLOW = 14,
+    VGA_COLOR_LIGHT_YELLOW = 14,
 } vga_color;
 
 // Global variables
@@ -125,7 +128,7 @@ void kernel_main(void) {
     
     // Display welcome message
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
-    terminal_writestring("ClaudeOS - Day 3 Development\n");
+    terminal_writestring("ClaudeOS - Day 4 Development\n");
     terminal_writestring("============================\n");
     
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
@@ -143,6 +146,17 @@ void kernel_main(void) {
     idt_init();
     terminal_writestring("IDT initialized successfully!\n");
     
+    // Initialize PIC
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_YELLOW, VGA_COLOR_BLACK));
+    terminal_writestring("Initializing PIC...\n");
+    pic_init();
+    terminal_writestring("PIC initialized successfully!\n");
+    
+    // Initialize Timer
+    terminal_writestring("Initializing Timer...\n");
+    timer_init();
+    terminal_writestring("Timer initialized successfully!\n");
+    
     // Enable interrupts
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
     terminal_writestring("Enabling interrupts...\n");
@@ -150,19 +164,32 @@ void kernel_main(void) {
     terminal_writestring("Interrupts enabled!\n\n");
     
     terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
-    terminal_writestring("Day 3 Features:\n");
+    terminal_writestring("Day 4 Features:\n");
     terminal_writestring("- GDT (Global Descriptor Table)\n");
     terminal_writestring("- IDT (Interrupt Descriptor Table)\n");
-    terminal_writestring("- Exception handling system\n");
-    terminal_writestring("- Memory segmentation active\n\n");
+    terminal_writestring("- PIC (Programmable Interrupt Controller)\n");
+    terminal_writestring("- Timer (100Hz system clock)\n");
+    terminal_writestring("- Hardware interrupt support\n\n");
     
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BROWN, VGA_COLOR_BLACK));
-    terminal_writestring("Status: Day 3 implementation complete\n");
-    terminal_writestring("System ready with interrupt support\n\n");
+    terminal_writestring("Status: Day 4 hardware drivers active\n");
+    terminal_writestring("Timer ticking at 100Hz frequency\n\n");
     
     terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
-    terminal_writestring("Note: Exception handlers are active\n");
-    terminal_writestring("System will handle CPU exceptions properly\n");
+    terminal_writestring("Timer demonstration:\n");
+    
+    // Demonstrate timer functionality
+    uint32_t start_ticks = timer_get_ticks();
+    terminal_writestring("Waiting 2 seconds...\n");
+    timer_wait(200);  // Wait 2 seconds (200 ticks at 100Hz)
+    uint32_t end_ticks = timer_get_ticks();
+    
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+    terminal_writestring("Timer test completed!\n");
+    // Simple tick count display (just show if it's working)
+    if (end_ticks > start_ticks) {
+        terminal_writestring("Timer is working correctly\n");
+    }
     
     // Kernel idle loop
     while (1) {
