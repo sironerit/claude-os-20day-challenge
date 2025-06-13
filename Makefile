@@ -15,7 +15,7 @@ ASFLAGS = -f elf32
 LDFLAGS = -m elf_i386 -T linker.ld
 
 # Object files
-OBJS = build/entry.o build/kernel.o
+OBJS = build/entry.o build/kernel.o build/gdt.o build/gdt_flush.o build/idt.o build/idt_flush.o build/isr.o build/isr_asm.o
 
 # Build directory
 BUILD_DIR = build
@@ -35,6 +35,30 @@ $(BUILD_DIR)/entry.o: kernel/entry.asm | $(BUILD_DIR)
 # Compile kernel C code
 $(BUILD_DIR)/kernel.o: kernel/kernel.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) $< -o $@
+
+# Compile GDT C code
+$(BUILD_DIR)/gdt.o: kernel/gdt.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $< -o $@
+
+# Compile GDT flush assembly
+$(BUILD_DIR)/gdt_flush.o: kernel/gdt_flush.asm | $(BUILD_DIR)
+	$(AS) $(ASFLAGS) $< -o $@
+
+# Compile IDT C code
+$(BUILD_DIR)/idt.o: kernel/idt.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $< -o $@
+
+# Compile IDT flush assembly
+$(BUILD_DIR)/idt_flush.o: kernel/idt_flush.asm | $(BUILD_DIR)
+	$(AS) $(ASFLAGS) $< -o $@
+
+# Compile ISR C code
+$(BUILD_DIR)/isr.o: kernel/isr.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $< -o $@
+
+# Compile ISR assembly
+$(BUILD_DIR)/isr_asm.o: kernel/isr.asm | $(BUILD_DIR)
+	$(AS) $(ASFLAGS) $< -o $@
 
 # Link kernel
 $(BUILD_DIR)/kernel.bin: $(OBJS)

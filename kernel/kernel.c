@@ -1,7 +1,9 @@
-// ClaudeOS Kernel - Day 2 Restart (Stable Base)
-// Simple and stable kernel implementation
+// ClaudeOS Kernel - Day 3 Implementation
+// GDT and IDT integration
 
 #include "kernel.h"
+#include "gdt.h"
+#include "idt.h"
 
 // VGA Text Mode Constants
 #define VGA_WIDTH 80
@@ -26,6 +28,7 @@ typedef enum {
     VGA_COLOR_LIGHT_MAGENTA = 13,
     VGA_COLOR_LIGHT_BROWN = 14,
     VGA_COLOR_WHITE = 15,
+    VGA_COLOR_YELLOW = 14,
 } vga_color;
 
 // Global variables
@@ -122,20 +125,44 @@ void kernel_main(void) {
     
     // Display welcome message
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
-    terminal_writestring("ClaudeOS - Day 2 Restart\n");
-    terminal_writestring("========================\n");
+    terminal_writestring("ClaudeOS - Day 3 Development\n");
+    terminal_writestring("============================\n");
     
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
-    terminal_writestring("Simple C kernel loaded successfully!\n");
+    terminal_writestring("Kernel loaded successfully!\n");
     terminal_writestring("VGA text mode initialized.\n");
     
+    // Initialize GDT
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK));
+    terminal_writestring("Initializing GDT...\n");
+    gdt_init();
+    terminal_writestring("GDT initialized successfully!\n");
+    
+    // Initialize IDT
+    terminal_writestring("Initializing IDT...\n");
+    idt_init();
+    terminal_writestring("IDT initialized successfully!\n");
+    
+    // Enable interrupts
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+    terminal_writestring("Enabling interrupts...\n");
+    asm volatile ("sti");
+    terminal_writestring("Interrupts enabled!\n\n");
+    
     terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
-    terminal_writestring("System is stable and ready.\n");
-    terminal_writestring("Basic kernel functionality working.\n\n");
+    terminal_writestring("Day 3 Features:\n");
+    terminal_writestring("- GDT (Global Descriptor Table)\n");
+    terminal_writestring("- IDT (Interrupt Descriptor Table)\n");
+    terminal_writestring("- Exception handling system\n");
+    terminal_writestring("- Memory segmentation active\n\n");
     
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BROWN, VGA_COLOR_BLACK));
-    terminal_writestring("Status: Stable base implementation\n");
-    terminal_writestring("Ready for gradual driver addition\n");
+    terminal_writestring("Status: Day 3 implementation complete\n");
+    terminal_writestring("System ready with interrupt support\n\n");
+    
+    terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
+    terminal_writestring("Note: Exception handlers are active\n");
+    terminal_writestring("System will handle CPU exceptions properly\n");
     
     // Kernel idle loop
     while (1) {
