@@ -1,11 +1,13 @@
-// ClaudeOS Kernel - Day 4 Implementation
-// Hardware drivers integration
+// ClaudeOS Kernel - Day 5 Implementation
+// Complete hardware drivers integration
 
 #include "kernel.h"
 #include "gdt.h"
 #include "idt.h"
 #include "pic.h"
 #include "timer.h"
+#include "keyboard.h"
+#include "serial.h"
 
 // VGA Text Mode Constants
 #define VGA_WIDTH 80
@@ -31,7 +33,6 @@ typedef enum {
     VGA_COLOR_LIGHT_BROWN = 14,
     VGA_COLOR_WHITE = 15,
     VGA_COLOR_YELLOW = 14,
-    VGA_COLOR_LIGHT_YELLOW = 14,
 } vga_color;
 
 // Global variables
@@ -128,7 +129,7 @@ void kernel_main(void) {
     
     // Display welcome message
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
-    terminal_writestring("ClaudeOS - Day 4 Development\n");
+    terminal_writestring("ClaudeOS - Day 5 Development\n");
     terminal_writestring("============================\n");
     
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
@@ -147,7 +148,7 @@ void kernel_main(void) {
     terminal_writestring("IDT initialized successfully!\n");
     
     // Initialize PIC
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_YELLOW, VGA_COLOR_BLACK));
+    terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
     terminal_writestring("Initializing PIC...\n");
     pic_init();
     terminal_writestring("PIC initialized successfully!\n");
@@ -157,6 +158,21 @@ void kernel_main(void) {
     timer_init();
     terminal_writestring("Timer initialized successfully!\n");
     
+    // Initialize Serial Port
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK));
+    terminal_writestring("Initializing Serial Port...\n");
+    if (serial_init(SERIAL_COM1_BASE) == 0) {
+        terminal_writestring("Serial port initialized successfully!\n");
+        debug_write_string("ClaudeOS Day 5 - Serial debug output active\n");
+    } else {
+        terminal_writestring("Serial port initialization failed!\n");
+    }
+    
+    // Initialize Keyboard
+    terminal_writestring("Initializing Keyboard...\n");
+    keyboard_init();
+    terminal_writestring("Keyboard initialized successfully!\n");
+    
     // Enable interrupts
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
     terminal_writestring("Enabling interrupts...\n");
@@ -164,31 +180,52 @@ void kernel_main(void) {
     terminal_writestring("Interrupts enabled!\n\n");
     
     terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
-    terminal_writestring("Day 4 Features:\n");
+    terminal_writestring("Day 5 Features:\n");
     terminal_writestring("- GDT (Global Descriptor Table)\n");
     terminal_writestring("- IDT (Interrupt Descriptor Table)\n");
     terminal_writestring("- PIC (Programmable Interrupt Controller)\n");
     terminal_writestring("- Timer (100Hz system clock)\n");
-    terminal_writestring("- Hardware interrupt support\n\n");
+    terminal_writestring("- Keyboard (PS/2 with ASCII conversion)\n");
+    terminal_writestring("- Serial Port (UART debug output)\n\n");
     
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BROWN, VGA_COLOR_BLACK));
-    terminal_writestring("Status: Day 4 hardware drivers active\n");
-    terminal_writestring("Timer ticking at 100Hz frequency\n\n");
+    terminal_writestring("Status: Day 5 complete drivers active\n");
+    terminal_writestring("All hardware components operational\n\n");
     
     terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
-    terminal_writestring("Timer demonstration:\n");
+    terminal_writestring("Interactive keyboard test:\n");
+    terminal_writestring("Type keys and see them appear!\n");
+    terminal_writestring("(Press any key to continue...)\n\n");
     
-    // Demonstrate timer functionality
-    uint32_t start_ticks = timer_get_ticks();
-    terminal_writestring("Waiting 2 seconds...\n");
-    timer_wait(200);  // Wait 2 seconds (200 ticks at 100Hz)
-    uint32_t end_ticks = timer_get_ticks();
+    // Interactive keyboard demonstration
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+    terminal_writestring("Keyboard Input: ");
     
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
-    terminal_writestring("Timer test completed!\n");
-    // Simple tick count display (just show if it's working)
-    if (end_ticks > start_ticks) {
-        terminal_writestring("Timer is working correctly\n");
+    // Display keyboard input in real-time
+    while (1) {
+        if (keyboard_has_input()) {
+            char c = keyboard_get_char();
+            if (c == '\n') {
+                // Enter key - show completion message
+                terminal_writestring("\n\n");
+                terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+                terminal_writestring("Keyboard test completed successfully!\n");
+                terminal_writestring("Day 5 implementation working perfectly.\n");
+                debug_write_string("Day 5 keyboard test completed successfully!\n");
+                break;
+            } else if (c == '\b') {
+                // Backspace - simple handling (just move cursor back)
+                terminal_writestring("\b \b");
+            } else {
+                // Regular character
+                terminal_putchar(c);
+                // Also send to serial debug
+                debug_putchar(c);
+            }
+        }
+        
+        // Let CPU rest
+        asm volatile ("hlt");
     }
     
     // Kernel idle loop

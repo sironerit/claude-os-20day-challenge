@@ -15,7 +15,7 @@ ASFLAGS = -f elf32
 LDFLAGS = -m elf_i386 -T linker.ld
 
 # Object files
-OBJS = build/entry.o build/kernel.o build/gdt.o build/gdt_flush.o build/idt.o build/idt_flush.o build/isr.o build/isr_asm.o build/pic.o build/io.o build/timer.o
+OBJS = build/entry.o build/kernel.o build/gdt.o build/gdt_flush.o build/idt.o build/idt_flush.o build/isr.o build/isr_asm.o build/pic.o build/io.o build/timer.o build/keyboard.o build/serial.o
 
 # Build directory
 BUILD_DIR = build
@@ -70,6 +70,14 @@ $(BUILD_DIR)/io.o: kernel/io.asm | $(BUILD_DIR)
 
 # Compile Timer C code
 $(BUILD_DIR)/timer.o: kernel/timer.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $< -o $@
+
+# Compile Keyboard C code
+$(BUILD_DIR)/keyboard.o: kernel/keyboard.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $< -o $@
+
+# Compile Serial C code
+$(BUILD_DIR)/serial.o: kernel/serial.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) $< -o $@
 
 # Link kernel
