@@ -1,111 +1,66 @@
-# Claude OS Makefile
-# 70日チャレンジ - Day 1作成
+# ClaudeOS Makefile - Day 2 Restart (Simple Version)
 
-# コンパイラとツール設定
 CC = gcc
 AS = nasm
 LD = ld
 
-# フラグ設定
-CFLAGS = -m32 -nostdlib -nostdinc -fno-builtin -fno-stack-protector -nostartfiles -nodefaultlibs -Wall -Wextra -Werror -c
+# Compiler flags for 32-bit kernel
+CFLAGS = -m32 -nostdlib -nostdinc -fno-builtin -fno-stack-protector \
+         -nostartfiles -nodefaultlibs -Wall -Wextra -Werror -c
+
+# Assembler flags
 ASFLAGS = -f elf32
+
+# Linker flags
 LDFLAGS = -m elf_i386 -T linker.ld
 
-# ディレクトリ設定
-BOOT_DIR = boot
-KERNEL_DIR = kernel
+# Object files
+OBJS = build/entry.o build/kernel.o
+
+# Build directory
 BUILD_DIR = build
-ISO_DIR = iso
 
-# ターゲット設定
-BOOTLOADER = $(BUILD_DIR)/bootloader.bin
-BOOTLOADER_PROTECTED = $(BUILD_DIR)/bootloader_protected.bin
-KERNEL = $(BUILD_DIR)/kernel.bin
-OS_IMAGE = $(BUILD_DIR)/claude-os.img
-ISO_IMAGE = $(BUILD_DIR)/claude-os.iso
+.PHONY: all clean run run-kernel
 
-# デフォルトターゲット
-all: $(OS_IMAGE)
+all: $(BUILD_DIR)/kernel.bin
 
-# ビルドディレクトリ作成
+# Ensure build directory exists
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
-# ブートローダービルド（Day 2実装）
-$(BOOTLOADER): $(BUILD_DIR) $(BOOT_DIR)/boot.asm
-	@echo "Building basic bootloader..."
-	$(AS) -f bin $(BOOT_DIR)/boot.asm -o $(BOOTLOADER)
+# Compile kernel entry point
+$(BUILD_DIR)/entry.o: kernel/entry.asm | $(BUILD_DIR)
+	$(AS) $(ASFLAGS) $< -o $@
 
-# プロテクトモード対応ブートローダー
-$(BOOTLOADER_PROTECTED): $(BUILD_DIR) $(BOOT_DIR)/boot_protected.asm
-	@echo "Building protected mode bootloader..."
-	$(AS) -f bin $(BOOT_DIR)/boot_protected.asm -o $(BOOTLOADER_PROTECTED)
+# Compile kernel C code
+$(BUILD_DIR)/kernel.o: kernel/kernel.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $< -o $@
 
-# カーネルビルド（Day 4実装: GDT + IDT + 割り込み）
-$(KERNEL): $(BUILD_DIR) $(KERNEL_DIR)/kernel.c $(KERNEL_DIR)/entry.asm $(KERNEL_DIR)/gdt.c $(KERNEL_DIR)/gdt_flush.asm $(KERNEL_DIR)/idt.c $(KERNEL_DIR)/idt_flush.asm $(KERNEL_DIR)/isr.asm $(KERNEL_DIR)/isr.c $(KERNEL_DIR)/io.asm
-	@echo "Building kernel with GDT, IDT, and interrupts..."
-	$(AS) $(ASFLAGS) $(KERNEL_DIR)/entry.asm -o $(BUILD_DIR)/entry.o
-	$(AS) $(ASFLAGS) $(KERNEL_DIR)/gdt_flush.asm -o $(BUILD_DIR)/gdt_flush.o
-	$(AS) $(ASFLAGS) $(KERNEL_DIR)/idt_flush.asm -o $(BUILD_DIR)/idt_flush.o
-	$(AS) $(ASFLAGS) $(KERNEL_DIR)/isr.asm -o $(BUILD_DIR)/isr.o
-	$(AS) $(ASFLAGS) $(KERNEL_DIR)/io.asm -o $(BUILD_DIR)/io.o
-	$(CC) $(CFLAGS) $(KERNEL_DIR)/kernel.c -o $(BUILD_DIR)/kernel.o
-	$(CC) $(CFLAGS) $(KERNEL_DIR)/gdt.c -o $(BUILD_DIR)/gdt.o
-	$(CC) $(CFLAGS) $(KERNEL_DIR)/idt.c -o $(BUILD_DIR)/idt.o
-	$(CC) $(CFLAGS) $(KERNEL_DIR)/isr.c -o $(BUILD_DIR)/isr_c.o
-	$(LD) $(LDFLAGS) -o $(KERNEL) $(BUILD_DIR)/entry.o $(BUILD_DIR)/kernel.o $(BUILD_DIR)/gdt.o $(BUILD_DIR)/gdt_flush.o $(BUILD_DIR)/idt.o $(BUILD_DIR)/idt_flush.o $(BUILD_DIR)/isr.o $(BUILD_DIR)/isr_c.o $(BUILD_DIR)/io.o
+# Link kernel
+$(BUILD_DIR)/kernel.bin: $(OBJS)
+	$(LD) $(LDFLAGS) $(OBJS) -o $@
 
-# OSイメージ作成（Day 3: ブートローダー+カーネル統合）
-$(OS_IMAGE): $(BOOTLOADER) $(KERNEL)
-	@echo "Creating OS image with bootloader and kernel..."
-	dd if=$(BOOTLOADER) of=$(OS_IMAGE) bs=512 count=1
-	dd if=$(KERNEL) of=$(OS_IMAGE) bs=512 seek=1
+# Run kernel in QEMU
+run-kernel: $(BUILD_DIR)/kernel.bin
+	qemu-system-i386 -kernel $< -m 32M
 
-# QEMU実行（基本ブートローダー）
-run: $(BOOTLOADER)
-	qemu-system-i386 -drive file=$(BOOTLOADER),format=raw -m 16M
+# Run basic bootloader
+run:
+	nasm -f bin boot/boot.asm -o $(BUILD_DIR)/bootloader.bin
+	qemu-system-i386 -drive file=$(BUILD_DIR)/bootloader.bin,format=raw -m 16M
 
-# QEMU実行（プロテクトモード）
-run-protected: $(BOOTLOADER_PROTECTED)
-	qemu-system-i386 -drive file=$(BOOTLOADER_PROTECTED),format=raw -m 16M
+# Run protected mode bootloader
+run-protected:
+	nasm -f bin boot/boot_protected.asm -o $(BUILD_DIR)/bootloader_protected.bin
+	qemu-system-i386 -drive file=$(BUILD_DIR)/bootloader_protected.bin,format=raw -m 16M
 
-# QEMU実行（カーネル単体テスト）
-run-kernel: $(KERNEL)
-	qemu-system-i386 -kernel $(KERNEL) -m 16M
-
-# QEMU実行（完全なOSイメージ）
-run-os: $(OS_IMAGE)
-	qemu-system-i386 -drive file=$(OS_IMAGE),format=raw -m 16M
-
-# ISO作成
-iso: $(ISO_IMAGE)
-
-$(ISO_IMAGE): $(OS_IMAGE)
-	mkdir -p $(ISO_DIR)/boot/grub
-	cp $(OS_IMAGE) $(ISO_DIR)/boot/
-	genisoimage -R -b boot/grub/stage2_eltorito -no-emul-boot -boot-load-size 4 -boot-info-table -o $(ISO_IMAGE) $(ISO_DIR)
-
-# クリーンアップ
+# Clean build files
 clean:
-	rm -rf $(BUILD_DIR)
-	rm -rf $(ISO_DIR)
+	rm -rf $(BUILD_DIR)/*
 
-# デバッグ情報
+# Debug information
 info:
-	@echo "Claude OS 70日チャレンジ"
-	@echo "Day 2: ブートローダー実装"
-	@echo "Build Directory: $(BUILD_DIR)"
 	@echo "Compiler: $(CC)"
 	@echo "Assembler: $(AS)"
-
-# ヘルプ
-help:
-	@echo "Claude OS Makefile Commands:"
-	@echo "  make all    - フルビルド"
-	@echo "  make run    - QEMU実行"
-	@echo "  make iso    - ISO作成"
-	@echo "  make clean  - クリーンアップ"
-	@echo "  make info   - ビルド情報表示"
-	@echo "  make help   - このヘルプ表示"
-
-.PHONY: all run iso clean info help
+	@echo "Linker: $(LD)"
+	@echo "Objects: $(OBJS)"

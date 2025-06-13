@@ -1,39 +1,34 @@
-/* ClaudeOS Linker Script
-   Day 3: Kernel linking configuration with Multiboot */
+/* ClaudeOS Linker Script - Day 2 Restart (Simple Version) */
 
 ENTRY(_start)
 
 SECTIONS
 {
-    /* Kernel loads at 1MB mark */
-    . = 0x100000;
-    
-    /* Multiboot header must be early in the file */
-    .multiboot ALIGN(4K) : {
+    /* Load at 1MB address */
+    . = 1M;
+
+    /* Multiboot header first */
+    .multiboot : {
         *(.multiboot)
     }
-    
+
     /* Code section */
-    .text ALIGN(4K) : {
+    .text : {
         *(.text)
     }
-    
+
     /* Read-only data */
-    .rodata ALIGN(4K) : {
+    .rodata : {
         *(.rodata)
     }
-    
-    /* Initialized data */
-    .data ALIGN(4K) : {
+
+    /* Data section */
+    .data : {
         *(.data)
     }
-    
-    /* Uninitialized data */
-    .bss ALIGN(4K) : {
-        *(COMMON)
+
+    /* BSS section */
+    .bss : {
         *(.bss)
     }
-    
-    /* End of kernel marker */
-    end = .;
 }

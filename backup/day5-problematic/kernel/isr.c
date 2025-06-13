@@ -57,6 +57,10 @@ static const char* exception_messages[] = {
     "SIMD Floating-Point Exception"
 };
 
+// Forward declarations
+void timer_callback(void);
+void keyboard_callback(void);
+
 // ISR handler - called from assembly
 void isr_handler(registers_t regs) {
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
@@ -111,23 +115,14 @@ static uint32_t timer_ticks = 0;
 void timer_callback(void) {
     timer_ticks++;
     
-    // Display timer every 100 ticks (roughly 1 second)
-    if (timer_ticks % 100 == 0) {
-        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
-        terminal_writestring("Timer: ");
-        // Simple tick display
-        terminal_writestring("tick\n");
-    }
+    // No output to avoid screen flooding
 }
 
 // Keyboard callback (basic key detection)
 void keyboard_callback(void) {
     uint8_t scancode = inb(0x60); // Read from keyboard port
     
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK));
-    terminal_writestring("Key pressed: ");
-    // Simple scancode display
-    terminal_writestring("key\n");
-    
+    // No output to avoid screen flooding
     (void)scancode; // Suppress unused variable warning
 }
+
