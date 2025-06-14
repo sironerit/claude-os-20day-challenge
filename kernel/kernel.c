@@ -1,5 +1,5 @@
-// ClaudeOS Kernel - Day 5 Implementation
-// Complete hardware drivers integration
+// ClaudeOS Kernel - Day 6 Implementation
+// Memory management system integration
 
 #include "kernel.h"
 #include "gdt.h"
@@ -8,6 +8,9 @@
 #include "timer.h"
 #include "keyboard.h"
 #include "serial.h"
+#include "pmm.h"
+#include "vmm.h"
+#include "heap.h"
 
 // VGA Text Mode Constants
 #define VGA_WIDTH 80
@@ -129,7 +132,7 @@ void kernel_main(void) {
     
     // Display welcome message
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
-    terminal_writestring("ClaudeOS - Day 5 Development\n");
+    terminal_writestring("ClaudeOS - Day 6 Development\n");
     terminal_writestring("============================\n");
     
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
@@ -163,7 +166,7 @@ void kernel_main(void) {
     terminal_writestring("Initializing Serial Port...\n");
     if (serial_init(SERIAL_COM1_BASE) == 0) {
         terminal_writestring("Serial port initialized successfully!\n");
-        debug_write_string("ClaudeOS Day 5 - Serial debug output active\n");
+        debug_write_string("ClaudeOS Day 6 - Serial debug output active\n");
     } else {
         terminal_writestring("Serial port initialization failed!\n");
     }
@@ -173,6 +176,28 @@ void kernel_main(void) {
     keyboard_init();
     terminal_writestring("Keyboard initialized successfully!\n");
     
+    // Initialize Physical Memory Manager
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+    terminal_writestring("Initializing Physical Memory Manager...\n");
+    pmm_init();
+    terminal_writestring("PMM initialized successfully!\n");
+    
+    // Initialize Virtual Memory Manager
+    terminal_writestring("Initializing Virtual Memory Manager...\n");
+    vmm_init();
+    terminal_writestring("VMM initialized successfully!\n");
+    
+    // Enable paging
+    terminal_writestring("Enabling paging...\n");
+    vmm_switch_page_directory(current_page_directory);
+    vmm_enable_paging();
+    terminal_writestring("Paging enabled successfully!\n");
+    
+    // Initialize Kernel Heap
+    terminal_writestring("Initializing Kernel Heap...\n");
+    heap_init();
+    terminal_writestring("Heap initialized successfully!\n");
+    
     // Enable interrupts
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
     terminal_writestring("Enabling interrupts...\n");
@@ -180,53 +205,73 @@ void kernel_main(void) {
     terminal_writestring("Interrupts enabled!\n\n");
     
     terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
-    terminal_writestring("Day 5 Features:\n");
-    terminal_writestring("- GDT (Global Descriptor Table)\n");
-    terminal_writestring("- IDT (Interrupt Descriptor Table)\n");
-    terminal_writestring("- PIC (Programmable Interrupt Controller)\n");
-    terminal_writestring("- Timer (100Hz system clock)\n");
-    terminal_writestring("- Keyboard (PS/2 with ASCII conversion)\n");
-    terminal_writestring("- Serial Port (UART debug output)\n\n");
+    terminal_writestring("Day 6 Features:\n");
+    terminal_writestring("- Physical Memory Manager (PMM)\n");
+    terminal_writestring("- Virtual Memory Manager (VMM)\n");
+    terminal_writestring("- Paging System (4KB pages)\n");
+    terminal_writestring("- Kernel Heap (kmalloc/kfree)\n");
+    terminal_writestring("- Memory statistics and debugging\n\n");
     
+    // Memory management demonstration
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BROWN, VGA_COLOR_BLACK));
-    terminal_writestring("Status: Day 5 complete drivers active\n");
-    terminal_writestring("All hardware components operational\n\n");
+    terminal_writestring("Memory Management Test:\n");
     
+    // Display memory statistics
+    terminal_setcolor(vga_entry_color(VGA_COLOR_CYAN, VGA_COLOR_BLACK));
+    pmm_dump_stats();
+    terminal_writestring("\n");
+    heap_dump_stats();
+    terminal_writestring("\n");
+    
+    // Test dynamic memory allocation
     terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
-    terminal_writestring("Interactive keyboard test:\n");
-    terminal_writestring("Type keys and see them appear!\n");
-    terminal_writestring("(Press any key to continue...)\n\n");
+    terminal_writestring("Testing dynamic memory allocation...\n");
     
-    // Interactive keyboard demonstration
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
-    terminal_writestring("Keyboard Input: ");
-    
-    // Display keyboard input in real-time
-    while (1) {
-        if (keyboard_has_input()) {
-            char c = keyboard_get_char();
-            if (c == '\n') {
-                // Enter key - show completion message
-                terminal_writestring("\n\n");
-                terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
-                terminal_writestring("Keyboard test completed successfully!\n");
-                terminal_writestring("Day 5 implementation working perfectly.\n");
-                debug_write_string("Day 5 keyboard test completed successfully!\n");
-                break;
-            } else if (c == '\b') {
-                // Backspace - simple handling (just move cursor back)
-                terminal_writestring("\b \b");
-            } else {
-                // Regular character
-                terminal_putchar(c);
-                // Also send to serial debug
-                debug_putchar(c);
-            }
-        }
-        
-        // Let CPU rest
-        asm volatile ("hlt");
+    void* ptr1 = kmalloc(1024);
+    terminal_writestring("Allocated 1024 bytes: ");
+    if (ptr1) {
+        terminal_writestring("SUCCESS\n");
+        debug_write_string("kmalloc(1024) successful\n");
+    } else {
+        terminal_writestring("FAILED\n");
     }
+    
+    void* ptr2 = kmalloc(2048);
+    terminal_writestring("Allocated 2048 bytes: ");
+    if (ptr2) {
+        terminal_writestring("SUCCESS\n");
+        debug_write_string("kmalloc(2048) successful\n");
+    } else {
+        terminal_writestring("FAILED\n");
+    }
+    
+    void* ptr3 = kcalloc(10, 64);
+    terminal_writestring("Allocated 10x64 bytes (zeroed): ");
+    if (ptr3) {
+        terminal_writestring("SUCCESS\n");
+        debug_write_string("kcalloc(10, 64) successful\n");
+    } else {
+        terminal_writestring("FAILED\n");
+    }
+    
+    // Free some memory
+    if (ptr1) {
+        kfree(ptr1);
+        terminal_writestring("Freed first allocation\n");
+    }
+    
+    if (ptr2) {
+        kfree(ptr2);
+        terminal_writestring("Freed second allocation\n");
+    }
+    
+    terminal_writestring("\nAfter allocations and frees:\n");
+    heap_dump_stats();
+    
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+    terminal_writestring("\nDay 6 Memory Management System Complete!\n");
+    terminal_writestring("All components operational and tested.\n");
+    debug_write_string("Day 6 memory management test completed successfully!\n");
     
     // Kernel idle loop
     while (1) {

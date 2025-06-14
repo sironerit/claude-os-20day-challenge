@@ -15,7 +15,7 @@ ASFLAGS = -f elf32
 LDFLAGS = -m elf_i386 -T linker.ld
 
 # Object files
-OBJS = build/entry.o build/kernel.o build/gdt.o build/gdt_flush.o build/idt.o build/idt_flush.o build/isr.o build/isr_asm.o build/pic.o build/io.o build/timer.o build/keyboard.o build/serial.o
+OBJS = build/entry.o build/kernel.o build/gdt.o build/gdt_flush.o build/idt.o build/idt_flush.o build/isr.o build/isr_asm.o build/pic.o build/io.o build/timer.o build/keyboard.o build/serial.o build/pmm.o build/vmm.o build/paging.o build/heap.o
 
 # Build directory
 BUILD_DIR = build
@@ -78,6 +78,22 @@ $(BUILD_DIR)/keyboard.o: kernel/keyboard.c | $(BUILD_DIR)
 
 # Compile Serial C code
 $(BUILD_DIR)/serial.o: kernel/serial.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $< -o $@
+
+# Compile PMM C code
+$(BUILD_DIR)/pmm.o: kernel/pmm.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $< -o $@
+
+# Compile VMM C code
+$(BUILD_DIR)/vmm.o: kernel/vmm.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $< -o $@
+
+# Compile Paging assembly
+$(BUILD_DIR)/paging.o: kernel/paging.asm | $(BUILD_DIR)
+	$(AS) $(ASFLAGS) $< -o $@
+
+# Compile Heap C code
+$(BUILD_DIR)/heap.o: kernel/heap.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) $< -o $@
 
 # Link kernel
