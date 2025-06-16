@@ -82,4 +82,7 @@ extern void irq13(void);  // FPU
 extern void irq14(void);  // ATA 1
 extern void irq15(void);  // ATA 2
 
+// System call handler
+extern void syscall_interrupt_handler(void);  // System calls (INT 0x80)
+
 #endif // IDT_H

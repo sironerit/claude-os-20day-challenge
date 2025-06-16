@@ -13,6 +13,7 @@
 #include "heap.h"
 #include "process.h"
 #include "string.h"
+#include "syscall.h"
 
 // VGA Text Mode Constants
 #define VGA_WIDTH 80
@@ -256,17 +257,24 @@ void kernel_main(void) {
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK));
     terminal_writestring("Initializing Process Management System...\n");
     process_init();
-    terminal_writestring("Process management initialized successfully!\n\n");
+    terminal_writestring("Process management initialized successfully!\n");
+    
+    // Initialize System Call System
+    terminal_writestring("Initializing System Call Interface...\n");
+    syscall_init();
+    terminal_writestring("System calls initialized successfully!\n\n");
     
     terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
-    terminal_writestring("Day 7 Features:\n");
+    terminal_writestring("Day 8 Features:\n");
     terminal_writestring("- Physical Memory Manager (PMM)\n");
     terminal_writestring("- Virtual Memory Manager (VMM)\n");
     terminal_writestring("- Paging System (4KB pages)\n");
     terminal_writestring("- Kernel Heap (kmalloc/kfree)\n");
     terminal_writestring("- Process Management System\n");
     terminal_writestring("- Round-robin Scheduler\n");
-    terminal_writestring("- Context Switching\n\n");
+    terminal_writestring("- Context Switching\n");
+    terminal_writestring("- System Call Interface (INT 0x80)\n");
+    terminal_writestring("- 4 Basic System Calls\n\n");
     
     // Memory management demonstration
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BROWN, VGA_COLOR_BLACK));
@@ -327,13 +335,34 @@ void kernel_main(void) {
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
     terminal_writestring("\nMemory Management Test Complete!\n\n");
     
-    // Process Management Demonstration
+    // System Call Demonstration
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+    terminal_writestring("System Call Test:\n");
+    
+    // Test system calls from kernel context
+    terminal_writestring("Testing system calls from kernel...\n");
+    
+    // Test SYS_HELLO
+    terminal_writestring("Calling sys_hello: ");
+    int result = syscall_hello();
+    terminal_printf("Result: %d\n", result);
+    
+    // Test SYS_GETPID
+    terminal_writestring("Calling sys_getpid: ");
+    int pid = syscall_getpid();
+    terminal_printf("PID: %d\n", pid);
+    
+    // Test SYS_WRITE
+    syscall_write("Hello from syscall_write!\n");
+    
+    terminal_writestring("Kernel system call tests complete!\n\n");
+    
+    // Process Management Demonstration
     terminal_writestring("Process Management Test:\n");
     
-    // Create test processes
+    // Create test processes (including syscall test process)
     terminal_writestring("Creating test processes...\n");
-    process_t* proc1 = process_create("test_proc_1", test_process_1, PRIORITY_NORMAL);
+    process_t* proc1 = process_create("syscall_test", syscall_test_process, PRIORITY_NORMAL);
     process_t* proc2 = process_create("test_proc_2", test_process_2, PRIORITY_NORMAL);
     process_t* proc3 = process_create("idle_proc", idle_process, PRIORITY_LOW);
     
@@ -371,6 +400,30 @@ void kernel_main(void) {
 }
 
 // Test process functions
+
+// System call test process
+void syscall_test_process(void) {
+    terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
+    terminal_writestring("[SYSCALL_TEST] System call test process started\n");
+    
+    // Test all system calls from process context
+    terminal_writestring("[SYSCALL_TEST] Testing sys_hello...\n");
+    syscall_hello();
+    
+    terminal_writestring("[SYSCALL_TEST] Testing sys_getpid...\n");
+    int my_pid = syscall_getpid();
+    terminal_printf("[SYSCALL_TEST] My PID is: %d\n", my_pid);
+    
+    terminal_writestring("[SYSCALL_TEST] Testing sys_write...\n");
+    syscall_write("Message from syscall_test process!\n");
+    
+    terminal_writestring("[SYSCALL_TEST] Testing sys_yield...\n");
+    syscall_yield();
+    
+    terminal_writestring("[SYSCALL_TEST] All system calls tested successfully!\n");
+    process_exit();
+}
+
 void test_process_1(void) {
     terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
     terminal_writestring("[PROC1] Test process 1 running\n");

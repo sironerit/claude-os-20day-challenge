@@ -15,7 +15,7 @@ ASFLAGS = -f elf32
 LDFLAGS = -m elf_i386 -T linker.ld
 
 # Object files
-OBJS = build/entry.o build/kernel.o build/gdt.o build/gdt_flush.o build/idt.o build/idt_flush.o build/isr.o build/isr_asm.o build/pic.o build/io.o build/timer.o build/keyboard.o build/serial.o build/pmm.o build/vmm.o build/paging.o build/heap.o build/process.o build/context_switch.o build/string.o
+OBJS = build/entry.o build/kernel.o build/gdt.o build/gdt_flush.o build/idt.o build/idt_flush.o build/isr.o build/isr_asm.o build/pic.o build/io.o build/timer.o build/keyboard.o build/serial.o build/pmm.o build/vmm.o build/paging.o build/heap.o build/process.o build/context_switch.o build/string.o build/syscall.o build/syscall_handler.o
 
 # Build directory
 BUILD_DIR = build
@@ -107,6 +107,14 @@ $(BUILD_DIR)/context_switch.o: kernel/context_switch.asm | $(BUILD_DIR)
 # Compile String C code
 $(BUILD_DIR)/string.o: kernel/string.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) $< -o $@
+
+# Compile System Call C code
+$(BUILD_DIR)/syscall.o: kernel/syscall.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $< -o $@
+
+# Compile System Call Handler assembly
+$(BUILD_DIR)/syscall_handler.o: kernel/syscall_handler.asm | $(BUILD_DIR)
+	$(AS) $(ASFLAGS) $< -o $@
 
 # Link kernel
 $(BUILD_DIR)/kernel.bin: $(OBJS)
