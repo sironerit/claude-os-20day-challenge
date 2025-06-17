@@ -14,6 +14,7 @@
 #include "process.h"
 #include "string.h"
 #include "syscall.h"
+#include "../fs/simplefs.h"
 
 // VGA Text Mode Constants
 #define VGA_WIDTH 80
@@ -262,10 +263,21 @@ void kernel_main(void) {
     // Initialize System Call System
     terminal_writestring("Initializing System Call Interface...\n");
     syscall_init();
-    terminal_writestring("System calls initialized successfully!\n\n");
+    terminal_writestring("System calls initialized successfully!\n");
+    
+    // Initialize File System (Day 9)
+    terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
+    terminal_writestring("Initializing File System...\n");
+    int fs_result = fs_init();
+    if (fs_result == FS_SUCCESS) {
+        terminal_writestring("File system initialized successfully!\n");
+    } else {
+        terminal_writestring("File system initialization failed!\n");
+    }
+    terminal_writestring("\n");
     
     terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
-    terminal_writestring("Day 8 Features:\n");
+    terminal_writestring("Day 9 Features:\n");
     terminal_writestring("- Physical Memory Manager (PMM)\n");
     terminal_writestring("- Virtual Memory Manager (VMM)\n");
     terminal_writestring("- Paging System (4KB pages)\n");
@@ -274,7 +286,10 @@ void kernel_main(void) {
     terminal_writestring("- Round-robin Scheduler\n");
     terminal_writestring("- Context Switching\n");
     terminal_writestring("- System Call Interface (INT 0x80)\n");
-    terminal_writestring("- 4 Basic System Calls\n\n");
+    terminal_writestring("- File System (SimpleFS)\n");
+    terminal_writestring("- File Operations (create, read, write, close)\n");
+    terminal_writestring("- Directory Operations (mkdir, list)\n");
+    terminal_writestring("- 13 System Calls Total\n\n");
     
     // Memory management demonstration
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BROWN, VGA_COLOR_BLACK));
@@ -357,16 +372,66 @@ void kernel_main(void) {
     
     terminal_writestring("Kernel system call tests complete!\n\n");
     
+    // File System Demonstration (Day 9)
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+    terminal_writestring("File System Test:\n");
+    
+    if (fs_is_initialized()) {
+        // Display file system statistics
+        terminal_writestring("File system statistics:\n");
+        syscall_fs_stats();
+        terminal_writestring("\n");
+        
+        // Test basic file operations
+        terminal_writestring("Testing file operations...\n");
+        
+        // Create a test file
+        int fd = syscall_open("/test.txt", O_CREATE | O_WRITE);
+        if (fd >= 0) {
+            terminal_writestring("Created file '/test.txt'\n");
+            
+            // Write data to file
+            const char* test_data = "Hello, ClaudeFS! This is a test file.";
+            int bytes_written = syscall_write_file(fd, test_data, strlen(test_data));
+            terminal_printf("Wrote %d bytes to file\n", bytes_written);
+            
+            // Close the file
+            syscall_close(fd);
+            terminal_writestring("File closed\n");
+            
+            // Reopen for reading
+            fd = syscall_open("/test.txt", O_READ);
+            if (fd >= 0) {
+                char read_buffer[256];
+                int bytes_read = syscall_read_file(fd, read_buffer, 255);
+                read_buffer[bytes_read] = '\0';
+                terminal_printf("Read %d bytes: '%s'\n", bytes_read, read_buffer);
+                syscall_close(fd);
+            }
+        } else {
+            terminal_writestring("Failed to create test file\n");
+        }
+        
+        // List directory contents
+        terminal_writestring("Directory listing:\n");
+        syscall_list("/");
+        
+        terminal_writestring("File system test complete!\n\n");
+    } else {
+        terminal_writestring("File system not initialized - skipping tests\n\n");
+    }
+    
     // Process Management Demonstration
     terminal_writestring("Process Management Test:\n");
     
-    // Create test processes (including syscall test process)
+    // Create test processes (including file system test process)
     terminal_writestring("Creating test processes...\n");
     process_t* proc1 = process_create("syscall_test", syscall_test_process, PRIORITY_NORMAL);
-    process_t* proc2 = process_create("test_proc_2", test_process_2, PRIORITY_NORMAL);
-    process_t* proc3 = process_create("idle_proc", idle_process, PRIORITY_LOW);
+    process_t* proc2 = process_create("fs_test", fs_test_process, PRIORITY_NORMAL);
+    process_t* proc3 = process_create("test_proc_2", test_process_2, PRIORITY_NORMAL);
+    process_t* proc4 = process_create("idle_proc", idle_process, PRIORITY_LOW);
     
-    if (proc1 && proc2 && proc3) {
+    if (proc1 && proc2 && proc3 && proc4) {
         terminal_writestring("Test processes created successfully!\n");
     } else {
         terminal_writestring("Failed to create some test processes!\n");
@@ -421,6 +486,55 @@ void syscall_test_process(void) {
     syscall_yield();
     
     terminal_writestring("[SYSCALL_TEST] All system calls tested successfully!\n");
+    process_exit();
+}
+
+// File system test process (Day 9)
+void fs_test_process(void) {
+    terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
+    terminal_writestring("[FS_TEST] File system test process started\n");
+    
+    // Test file system operations from process context
+    terminal_writestring("[FS_TEST] Testing file system operations...\n");
+    
+    // Create a test file
+    terminal_writestring("[FS_TEST] Creating file '/process_test.txt'...\n");
+    int fd = syscall_open("/process_test.txt", O_CREATE | O_WRITE);
+    
+    if (fd >= 0) {
+        terminal_writestring("[FS_TEST] File created successfully!\n");
+        
+        // Write data to file
+        const char* data = "Hello from file system test process!";
+        int bytes_written = syscall_write_file(fd, data, strlen(data));
+        terminal_printf("[FS_TEST] Wrote %d bytes to file\n", bytes_written);
+        
+        // Close and reopen for reading
+        syscall_close(fd);
+        terminal_writestring("[FS_TEST] File closed, reopening for reading...\n");
+        
+        fd = syscall_open("/process_test.txt", O_READ);
+        if (fd >= 0) {
+            char buffer[256];
+            int bytes_read = syscall_read_file(fd, buffer, 255);
+            buffer[bytes_read] = '\0';
+            terminal_printf("[FS_TEST] Read back: '%s'\n", buffer);
+            syscall_close(fd);
+        }
+        
+        // Test directory listing
+        terminal_writestring("[FS_TEST] Listing directory contents:\n");
+        syscall_list("/");
+        
+        // Display file system statistics
+        terminal_writestring("[FS_TEST] File system statistics:\n");
+        syscall_fs_stats();
+        
+    } else {
+        terminal_writestring("[FS_TEST] Failed to create test file\n");
+    }
+    
+    terminal_writestring("[FS_TEST] File system test complete!\n");
     process_exit();
 }
 

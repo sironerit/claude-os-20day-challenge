@@ -21,6 +21,7 @@ void kernel_panic(const char* message);
 
 // Test process functions
 void syscall_test_process(void);
+void fs_test_process(void);
 void test_process_1(void);
 void test_process_2(void);
 void idle_process(void);
