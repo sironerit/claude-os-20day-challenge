@@ -19,9 +19,6 @@ void terminal_printf(const char* format, ...);
 // System Functions
 void kernel_panic(const char* message);
 
-// String utilities
-char* int_to_string(int value);
-
 // Test process functions
 void syscall_test_process(void);
 void fs_test_process(void);

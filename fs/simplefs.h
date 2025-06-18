@@ -4,7 +4,7 @@
 #include "../kernel/types.h"
 
 // ClaudeOS Simple File System (SimpleFS)
-// Day 9 Implementation - In-memory file system
+// Day 10 Implementation - Persistent disk-based file system
 
 // File System Constants
 #define SIMPLEFS_MAGIC          0xC1ADEFU  // ClaudeFS magic number
@@ -15,7 +15,14 @@
 #define SIMPLEFS_MAX_PATH       256         // Maximum path length
 #define SIMPLEFS_MAX_FD         32          // Maximum open file descriptors
 
-// File System Block Numbers
+// File System Block Numbers (disk LBA mapping)
+#define FS_DISK_START_LBA       128         // Start FS at LBA 128 (safe area)
+#define SUPERBLOCK_LBA          (FS_DISK_START_LBA + 0)   // Superblock at LBA 128
+#define FAT_BLOCK_LBA           (FS_DISK_START_LBA + 1)   // FAT at LBA 129
+#define ROOT_DIR_BLOCK_LBA      (FS_DISK_START_LBA + 2)   // Root dir at LBA 130
+#define DATA_START_BLOCK_LBA    (FS_DISK_START_LBA + 3)   // Data blocks start at LBA 131
+
+// Legacy in-memory block numbers (for compatibility)
 #define SUPERBLOCK_NUM          0           // Superblock at block 0
 #define FAT_BLOCK_NUM           1           // FAT at block 1  
 #define ROOT_DIR_BLOCK_NUM      2           // Root directory at block 2
@@ -148,5 +155,13 @@ void fs_dump_stats(void);
 void fs_dump_superblock(void);
 void fs_dump_fat(void);
 void fs_dump_directory(uint32_t dir_block);
+
+// Day 10: Disk persistence functions
+int fs_init_disk(uint8_t drive_num);          // Initialize persistent FS on disk
+int fs_load_from_disk(void);                  // Load FS from disk to memory
+int fs_save_to_disk(void);                    // Save memory FS to disk
+int fs_format_disk(uint8_t drive_num);        // Format disk with SimpleFS
+void fs_set_disk_mode(int enabled);           // Enable/disable disk persistence
+int fs_is_disk_mode(void);                    // Check if disk mode is enabled
 
 #endif // SIMPLEFS_H

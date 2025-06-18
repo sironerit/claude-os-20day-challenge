@@ -15,7 +15,6 @@
 #include "string.h"
 #include "syscall.h"
 #include "../fs/simplefs.h"
-#include "../drivers/ata.h"
 
 // VGA Text Mode Constants
 #define VGA_WIDTH 80
@@ -270,34 +269,6 @@ void kernel_main(void) {
         terminal_writestring("File system initialized successfully!\n");
     } else {
         terminal_writestring("File system initialization failed!\n");
-    }
-    terminal_writestring("\n");
-    
-    // Initialize ATA/IDE Storage System (Day 10 Phase 1)
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
-    terminal_writestring("Initializing ATA/IDE Storage System...\n");
-    ata_init();
-    terminal_writestring("ATA/IDE initialization completed!\n");
-    
-    // Test ATA read functionality (Phase 2)
-    terminal_writestring("Testing ATA disk read functionality...\n");
-    ata_test_read();
-    
-    // Test ATA write functionality (Phase 3)
-    terminal_writestring("Testing ATA disk write functionality...\n");
-    ata_test_write();
-    
-    // Format drive for file system (Phase 3)
-    terminal_writestring("Formatting drive for ClaudeFS...\n");
-    ata_format_drive(0);
-    
-    // Initialize persistent file system (Phase 4)
-    terminal_writestring("Initializing persistent file system...\n");
-    int fs_disk_result = fs_init_disk(0);
-    if (fs_disk_result == FS_SUCCESS) {
-        terminal_writestring("Persistent file system initialized successfully!\n");
-    } else {
-        terminal_writestring("Persistent file system initialization failed\n");
     }
     terminal_writestring("\n");
     

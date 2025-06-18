@@ -3,8 +3,6 @@
 
 global outb
 global inb
-global outw
-global inw
 global io_wait
 
 ; Write byte to I/O port
@@ -20,21 +18,6 @@ outb:
 inb:
     mov dx, [esp + 4]    ; Get port (first parameter)
     in al, dx            ; Input data from port
-    ret
-
-; Write word to I/O port
-; void outw(uint16_t port, uint16_t data)
-outw:
-    mov ax, [esp + 8]    ; Get data (second parameter)
-    mov dx, [esp + 4]    ; Get port (first parameter)
-    out dx, ax           ; Output data to port
-    ret
-
-; Read word from I/O port
-; uint16_t inw(uint16_t port)
-inw:
-    mov dx, [esp + 4]    ; Get port (first parameter)
-    in ax, dx            ; Input data from port
     ret
 
 ; I/O wait function (small delay for older hardware)

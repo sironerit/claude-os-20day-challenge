@@ -1,0 +1,1 @@
+qemu-system-i386: -drive file=/dev/zero,format=raw,if=ide,media=disk,size=10M: The sum of offset (0) and size (0) has to be smaller or equal to the  actual size of the containing file (0)

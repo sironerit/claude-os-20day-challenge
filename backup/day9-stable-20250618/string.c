@@ -48,42 +48,6 @@ size_t strlen(const char* str) {
     return len;
 }
 
-// Convert integer to string (simple implementation)
-static char int_buffer[32];
-char* int_to_string(int value) {
-    if (value == 0) {
-        int_buffer[0] = '0';
-        int_buffer[1] = '\0';
-        return int_buffer;
-    }
-    
-    int is_negative = 0;
-    if (value < 0) {
-        is_negative = 1;
-        value = -value;
-    }
-    
-    int i = 0;
-    while (value > 0) {
-        int_buffer[i++] = '0' + (value % 10);
-        value /= 10;
-    }
-    
-    if (is_negative) {
-        int_buffer[i++] = '-';
-    }
-    
-    // Reverse string
-    for (int j = 0; j < i / 2; j++) {
-        char temp = int_buffer[j];
-        int_buffer[j] = int_buffer[i - 1 - j];
-        int_buffer[i - 1 - j] = temp;
-    }
-    
-    int_buffer[i] = '\0';
-    return int_buffer;
-}
-
 // Copy string
 char* strcpy(char* dest, const char* src) {
     char* original_dest = dest;
