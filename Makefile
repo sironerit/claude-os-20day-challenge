@@ -14,8 +14,8 @@ ASFLAGS = -f elf32
 # Linker flags
 LDFLAGS = -m elf_i386 -T linker.ld
 
-# Object files
-OBJS = build/entry.o build/kernel.o build/gdt.o build/gdt_flush.o build/idt.o build/idt_flush.o build/isr.o build/isr_asm.o build/pic.o build/io.o build/timer.o build/keyboard.o build/serial.o build/pmm.o build/vmm.o build/paging.o build/heap.o build/process.o build/context_switch.o build/string.o build/syscall.o build/syscall_handler.o build/simplefs.o build/ata.o build/shell.o
+# Object files (Day 8 - syscalls added)
+OBJS = build/entry.o build/kernel.o build/gdt.o build/gdt_flush.o build/idt.o build/idt_flush.o build/isr.o build/isr_asm.o build/pic.o build/io.o build/timer.o build/keyboard.o build/serial.o build/pmm.o build/vmm.o build/paging.o build/heap.o build/process.o build/context_switch.o build/syscall.o build/syscall_interrupt_handler.o
 
 # Build directory
 BUILD_DIR = build
@@ -104,29 +104,14 @@ $(BUILD_DIR)/process.o: kernel/process.c | $(BUILD_DIR)
 $(BUILD_DIR)/context_switch.o: kernel/context_switch.asm | $(BUILD_DIR)
 	$(AS) $(ASFLAGS) $< -o $@
 
-# Compile String C code
-$(BUILD_DIR)/string.o: kernel/string.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) $< -o $@
-
-# Compile System Call C code
+# Compile System Call C code  
 $(BUILD_DIR)/syscall.o: kernel/syscall.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) $< -o $@
 
-# Compile System Call Handler assembly
-$(BUILD_DIR)/syscall_handler.o: kernel/syscall_handler.asm | $(BUILD_DIR)
+# Compile System Call Interrupt Handler assembly
+$(BUILD_DIR)/syscall_interrupt_handler.o: kernel/syscall_interrupt_handler.asm | $(BUILD_DIR)
 	$(AS) $(ASFLAGS) $< -o $@
 
-# Compile SimpleFS C code
-$(BUILD_DIR)/simplefs.o: fs/simplefs.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) $< -o $@
-
-# Compile ATA C code
-$(BUILD_DIR)/ata.o: drivers/ata.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) $< -o $@
-
-# Compile Shell C code
-$(BUILD_DIR)/shell.o: kernel/shell.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) $< -o $@
 
 # Link kernel
 $(BUILD_DIR)/kernel.bin: $(OBJS)

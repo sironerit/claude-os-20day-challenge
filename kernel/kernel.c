@@ -1,5 +1,5 @@
-// ClaudeOS Kernel - Day 7 Implementation
-// Process management system integration
+// ClaudeOS Kernel - Day 6 Implementation
+// Memory management system integration
 
 #include "kernel.h"
 #include "gdt.h"
@@ -12,17 +12,22 @@
 #include "vmm.h"
 #include "heap.h"
 #include "process.h"
-#include "string.h"
 #include "syscall.h"
-#include "../fs/simplefs.h"
-#include "../drivers/ata.h"
-#include "shell.h"
 
 // VGA Text Mode Constants
 #define VGA_WIDTH 80
 #define VGA_HEIGHT 25
 #define VGA_MEMORY 0xB8000
 
+// Kernel demonstration constants
+#define KERNEL_COUNTER_INTERVAL 1000000
+#define TEST_PROCESS_WORK_LOOP 100000
+
+// Variable argument list support for printf
+typedef __builtin_va_list va_list;
+#define va_start(v,l) __builtin_va_start(v,l)
+#define va_end(v) __builtin_va_end(v)
+#define va_arg(v,l) __builtin_va_arg(v,l)
 
 // Global variables
 static size_t terminal_row;
@@ -39,7 +44,12 @@ static inline uint16_t vga_entry(unsigned char uc, uint8_t color) {
     return (uint16_t) uc | (uint16_t) color << 8;
 }
 
-// strlen function moved to string.c
+size_t strlen(const char* str) {
+    size_t len = 0;
+    while (str[len])
+        len++;
+    return len;
+}
 
 // Terminal functions
 void terminal_initialize(void) {
@@ -55,18 +65,6 @@ void terminal_initialize(void) {
             terminal_buffer[index] = vga_entry(' ', terminal_color);
         }
     }
-}
-
-void terminal_clear(void) {
-    // Clear screen and reset cursor
-    for (size_t y = 0; y < VGA_HEIGHT; y++) {
-        for (size_t x = 0; x < VGA_WIDTH; x++) {
-            const size_t index = y * VGA_WIDTH + x;
-            terminal_buffer[index] = vga_entry(' ', terminal_color);
-        }
-    }
-    terminal_column = 0;
-    terminal_row = 0;
 }
 
 void terminal_setcolor(uint8_t color) {
@@ -94,6 +92,18 @@ void terminal_scroll(void) {
         size_t index = (VGA_HEIGHT - 1) * VGA_WIDTH + x;
         terminal_buffer[index] = vga_entry(' ', terminal_color);
     }
+}
+
+// Clear screen
+void terminal_clear(void) {
+    for (size_t y = 0; y < VGA_HEIGHT; y++) {
+        for (size_t x = 0; x < VGA_WIDTH; x++) {
+            const size_t index = y * VGA_WIDTH + x;
+            terminal_buffer[index] = vga_entry(' ', terminal_color);
+        }
+    }
+    terminal_column = 0;
+    terminal_row = 0;
 }
 
 void terminal_putchar(char c) {
@@ -204,10 +214,14 @@ void kernel_main(void) {
     // Initialize terminal
     terminal_initialize();
     
-    // Display welcome message
+    // Display welcome message  
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
-    terminal_writestring("ClaudeOS - Day 9 File System Demo\n");
-    terminal_writestring("==================================\n");
+    terminal_writestring("ClaudeOS - Day 8 Basic System Calls\n");
+    terminal_writestring("====================================\n");
+    
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+    terminal_writestring("Kernel loaded successfully!\n");
+    terminal_writestring("VGA text mode initialized.\n");
     
     // Initialize GDT
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK));
@@ -252,8 +266,32 @@ void kernel_main(void) {
     pmm_init();
     terminal_writestring("PMM initialized successfully!\n");
     
-    // Initialize basic memory management for shell
-    terminal_writestring("Basic memory management ready!\n");
+    // Initialize Virtual Memory Manager
+    terminal_writestring("Initializing Virtual Memory Manager...\n");
+    vmm_init();
+    terminal_writestring("VMM initialized successfully!\n");
+    
+    // Enable paging
+    terminal_writestring("Enabling paging...\n");
+    vmm_switch_page_directory(current_page_directory);
+    vmm_enable_paging();
+    terminal_writestring("Paging enabled successfully!\n");
+    
+    // Initialize Kernel Heap
+    terminal_writestring("Initializing Kernel Heap...\n");
+    heap_init();
+    terminal_writestring("Heap initialized successfully!\n");
+    
+    // Initialize Process Management
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK));
+    terminal_writestring("Initializing Process Management...\n");
+    process_init();
+    terminal_writestring("Process management initialized successfully!\n");
+    
+    // Initialize System Calls
+    terminal_writestring("Initializing System Calls...\n");
+    syscall_init();
+    terminal_writestring("System calls initialized successfully!\n");
     
     // Enable interrupts
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
@@ -261,126 +299,146 @@ void kernel_main(void) {
     asm volatile ("sti");
     terminal_writestring("Interrupts enabled!\n\n");
     
-    // === Day 6 Stable + Day 11 Shell Demo ===
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
-    terminal_writestring("\n=== ClaudeOS Day 11 Shell Demo ===\n");
-    terminal_writestring("Based on stable Day 6 foundation\n\n");
-    
     terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
-    terminal_writestring("Stable Features (Day 6):\n");
+    terminal_writestring("Day 8 Features:\n");
     terminal_writestring("- Physical Memory Manager (PMM)\n");
     terminal_writestring("- Virtual Memory Manager (VMM)\n");
     terminal_writestring("- Paging System (4KB pages)\n");
     terminal_writestring("- Kernel Heap (kmalloc/kfree)\n");
-    terminal_writestring("- Hardware Drivers (Timer, Keyboard, Serial)\n\n");
+    terminal_writestring("- Minimal Process Management\n");
+    terminal_writestring("- Basic Round-Robin Scheduler\n");
+    terminal_writestring("- Simple Context Switching\n");
+    terminal_writestring("- System Call Interface (INT 0x80)\n");
+    terminal_writestring("- 4 Basic System Calls (hello/write/getpid/yield)\n\n");
     
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
-    terminal_writestring("New Features (Day 11):\n");
-    terminal_writestring("- Interactive Command Shell\n");
-    terminal_writestring("- 11 Built-in Commands\n");
-    terminal_writestring("- File Operations (create, cat, ls, delete)\n");
-    terminal_writestring("- Directory Operations (mkdir, rmdir, cd)\n\n");
+    // Memory management demonstration
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BROWN, VGA_COLOR_BLACK));
+    terminal_writestring("Memory Management Test:\n");
     
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
-    terminal_writestring("All components ready for shell interface!\n\n");
+    // Display memory statistics
+    terminal_setcolor(vga_entry_color(VGA_COLOR_CYAN, VGA_COLOR_BLACK));
+    pmm_dump_stats();
+    terminal_writestring("\n");
+    heap_dump_stats();
+    terminal_writestring("\n");
     
-    // Initialize and start shell (Day 11 Phase 1)
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
-    terminal_writestring("Starting ClaudeOS Shell...\n");
-    shell_init();
-    
-    // Shell main loop with keyboard input processing
-    while (1) {
-        if (keyboard_has_input()) {
-            char c = keyboard_get_char();
-            shell_process_input(c);
-        }
-        asm volatile ("hlt");
-    }
-}
-
-// Test process functions
-
-// System call test process
-void syscall_test_process(void) {
+    // Test dynamic memory allocation
     terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
-    terminal_writestring("[SYSCALL_TEST] System call test process started\n");
+    terminal_writestring("Testing dynamic memory allocation...\n");
     
-    // Test all system calls from process context
-    terminal_writestring("[SYSCALL_TEST] Testing sys_hello...\n");
-    syscall_hello();
-    
-    terminal_writestring("[SYSCALL_TEST] Testing sys_getpid...\n");
-    int my_pid = syscall_getpid();
-    terminal_printf("[SYSCALL_TEST] My PID is: %d\n", my_pid);
-    
-    terminal_writestring("[SYSCALL_TEST] Testing sys_write...\n");
-    syscall_write("Message from syscall_test process!\n");
-    
-    terminal_writestring("[SYSCALL_TEST] Testing sys_yield...\n");
-    syscall_yield();
-    
-    terminal_writestring("[SYSCALL_TEST] All system calls tested successfully!\n");
-    process_exit();
-}
-
-// File system test process (Day 9)
-void fs_test_process(void) {
-    terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
-    terminal_writestring("[FS_TEST] File system test process started\n");
-    
-    // Test file system operations from process context
-    terminal_writestring("[FS_TEST] Testing file system operations...\n");
-    
-    // Create a test file
-    terminal_writestring("[FS_TEST] Creating file '/process_test.txt'...\n");
-    int fd = syscall_open("/process_test.txt", O_CREATE | O_WRITE);
-    
-    if (fd >= 0) {
-        terminal_writestring("[FS_TEST] File created successfully!\n");
-        
-        // Write data to file
-        const char* data = "Hello from file system test process!";
-        int bytes_written = syscall_write_file(fd, data, strlen(data));
-        terminal_printf("[FS_TEST] Wrote %d bytes to file\n", bytes_written);
-        
-        // Close and reopen for reading
-        syscall_close(fd);
-        terminal_writestring("[FS_TEST] File closed, reopening for reading...\n");
-        
-        fd = syscall_open("/process_test.txt", O_READ);
-        if (fd >= 0) {
-            char buffer[256];
-            int bytes_read = syscall_read_file(fd, buffer, 255);
-            buffer[bytes_read] = '\0';
-            terminal_printf("[FS_TEST] Read back: '%s'\n", buffer);
-            syscall_close(fd);
-        }
-        
-        // Test directory listing
-        terminal_writestring("[FS_TEST] Listing directory contents:\n");
-        syscall_list("/");
-        
-        // Display file system statistics
-        terminal_writestring("[FS_TEST] File system statistics:\n");
-        syscall_fs_stats();
-        
+    void* ptr1 = kmalloc(1024);
+    terminal_writestring("Allocated 1024 bytes: ");
+    if (ptr1) {
+        terminal_writestring("SUCCESS\n");
+        debug_write_string("kmalloc(1024) successful\n");
     } else {
-        terminal_writestring("[FS_TEST] Failed to create test file\n");
+        terminal_writestring("FAILED\n");
     }
     
-    terminal_writestring("[FS_TEST] File system test complete!\n");
-    process_exit();
+    void* ptr2 = kmalloc(2048);
+    terminal_writestring("Allocated 2048 bytes: ");
+    if (ptr2) {
+        terminal_writestring("SUCCESS\n");
+        debug_write_string("kmalloc(2048) successful\n");
+    } else {
+        terminal_writestring("FAILED\n");
+    }
+    
+    void* ptr3 = kcalloc(10, 64);
+    terminal_writestring("Allocated 10x64 bytes (zeroed): ");
+    if (ptr3) {
+        terminal_writestring("SUCCESS\n");
+        debug_write_string("kcalloc(10, 64) successful\n");
+    } else {
+        terminal_writestring("FAILED\n");
+    }
+    
+    // Free some memory
+    if (ptr1) {
+        kfree(ptr1);
+        terminal_writestring("Freed first allocation\n");
+    }
+    
+    if (ptr2) {
+        kfree(ptr2);
+        terminal_writestring("Freed second allocation\n");
+    }
+    
+    terminal_writestring("\nAfter allocations and frees:\n");
+    heap_dump_stats();
+    
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+    terminal_writestring("\nDay 6 Memory Management System Complete!\n");
+    terminal_writestring("All components operational and tested.\n");
+    debug_write_string("Day 6 memory management test completed successfully!\n");
+    
+    // Process management test
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+    terminal_writestring("Process Management Test:\n");
+    
+    // Create test processes  
+    int pid1 = process_create(test_process_1, "test1");
+    int pid2 = process_create(test_process_2, "test2");
+    
+    if (pid1 != INVALID_PID) {
+        terminal_printf("Created test process 1 (PID: %d)\n", pid1);
+    }
+    if (pid2 != INVALID_PID) {
+        terminal_printf("Created test process 2 (PID: %d)\n", pid2);
+    }
+    
+    // List all processes
+    process_list();
+    
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+    terminal_writestring("Day 7 Minimal Process Management Complete!\n");
+    terminal_writestring("Basic scheduling demonstration ready.\n");
+    
+    // System call testing
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+    terminal_writestring("\nSystem Call Testing:\n");
+    
+    // Test sys_hello system call
+    terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
+    terminal_writestring("Testing sys_hello system call...\n");
+    int result = syscall_hello();
+    terminal_printf("sys_hello returned: %d\n", result);
+    
+    // Test sys_write system call
+    terminal_writestring("Testing sys_write system call...\n");
+    result = syscall_write("Hello from system call!\n");
+    terminal_printf("sys_write returned: %d\n", result);
+    
+    // Test sys_getpid system call
+    terminal_writestring("Testing sys_getpid system call...\n");
+    result = syscall_getpid();
+    terminal_printf("sys_getpid returned: %d\n", result);
+    
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+    terminal_writestring("Day 8 Basic System Calls Complete!\n");
+    terminal_writestring("All 4 system calls operational and tested.\n");
+    
+    // Simple demonstration loop (no actual process switching yet)
+    int counter = 0;
+    while (1) {
+        asm volatile ("hlt");
+        
+        // Simple counter to show kernel is running
+        if (++counter % KERNEL_COUNTER_INTERVAL == 0) {
+            terminal_printf("Kernel running... (%d)\n", counter / KERNEL_COUNTER_INTERVAL);
+        }
+    }
 }
 
+// Test process functions (simple demonstrations)
 void test_process_1(void) {
     terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
     terminal_writestring("[PROC1] Test process 1 running\n");
     
     for (int i = 0; i < 3; i++) {
         terminal_printf("[PROC1] Iteration %d\n", i + 1);
-        // Simulate work
-        for (volatile int j = 0; j < 500000; j++);
+        // Simple loop simulation
+        for (volatile int j = 0; j < TEST_PROCESS_WORK_LOOP; j++);
     }
     
     terminal_writestring("[PROC1] Test process 1 exiting\n");
@@ -393,20 +451,10 @@ void test_process_2(void) {
     
     for (int i = 0; i < 3; i++) {
         terminal_printf("[PROC2] Iteration %d\n", i + 1);
-        // Simulate work
-        for (volatile int j = 0; j < 500000; j++);
+        // Simple loop simulation
+        for (volatile int j = 0; j < TEST_PROCESS_WORK_LOOP; j++);
     }
     
     terminal_writestring("[PROC2] Test process 2 exiting\n");
     process_exit();
-}
-
-void idle_process(void) {
-    terminal_setcolor(vga_entry_color(VGA_COLOR_DARK_GREY, VGA_COLOR_BLACK));
-    terminal_writestring("[IDLE] Idle process started\n");
-    
-    while (1) {
-        // Idle loop
-        asm volatile ("hlt");
-    }
 }

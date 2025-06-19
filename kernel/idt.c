@@ -58,8 +58,8 @@ void idt_init(void) {
     idt_set_gate(46, (uint32_t)irq14, 0x08, IDT_FLAG_PRESENT | IDT_FLAG_RING0 | IDT_FLAG_INT_GATE);
     idt_set_gate(47, (uint32_t)irq15, 0x08, IDT_FLAG_PRESENT | IDT_FLAG_RING0 | IDT_FLAG_INT_GATE);
 
-    // Set up system call handler (INT 0x80)
-    idt_set_gate(0x80, (uint32_t)syscall_interrupt_handler, 0x08, IDT_FLAG_PRESENT | IDT_FLAG_RING0 | IDT_FLAG_INT_GATE);
+    // System call handler (INT 0x80) - Day 8 Implementation
+    idt_set_gate(0x80, (uint32_t)syscall_interrupt_handler, 0x08, IDT_FLAG_PRESENT | IDT_FLAG_RING3 | IDT_FLAG_INT_GATE);
 
     // Load the IDT
     idt_flush((uint32_t)&idt_ptr);

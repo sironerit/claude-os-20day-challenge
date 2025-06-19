@@ -1,179 +1,89 @@
-// ClaudeOS Process Management System - Day 7
-// Process management implementation
+// ClaudeOS Process Management - Day 7 Minimal Implementation
+// Simple process management implementation
 
 #include "process.h"
 #include "kernel.h"
 #include "heap.h"
-#include "vmm.h"
-#include "string.h"
 
 // Global process management variables
 process_t* current_process = NULL;
-process_t* process_table[MAX_PROCESSES];
-uint32_t next_pid = 1;
+process_t* ready_queue_head = NULL;
+process_t* ready_queue_tail = NULL;
+process_t process_table[MAX_PROCESSES];
+int next_pid = FIRST_USER_PID;
 
-// Scheduler variables
-static process_t* ready_queue_head = NULL;
-static process_t* ready_queue_tail = NULL;
+// String functions (copied from string.c for now)
+static void strcpy_local(char* dest, const char* src) {
+    while (*src) {
+        *dest++ = *src++;
+    }
+    *dest = '\0';
+}
 
 // Initialize process management system
 void process_init(void) {
     // Clear process table
     for (int i = 0; i < MAX_PROCESSES; i++) {
-        process_table[i] = NULL;
+        process_table[i].pid = INVALID_PID;  // Mark as unused
+        process_table[i].state = PROCESS_TERMINATED;
+        process_table[i].stack = NULL;
+        process_table[i].next = NULL;
     }
     
-    // Initialize scheduler
-    scheduler_init();
+    // Initialize queue
+    ready_queue_head = NULL;
+    ready_queue_tail = NULL;
     
-    // Create kernel process (PID 0)
-    current_process = process_create("kernel", NULL, PRIORITY_HIGH);
-    current_process->pid = 0;
+    // Setup kernel process
+    current_process = &process_table[KERNEL_PID];
+    current_process->pid = KERNEL_PID;
     current_process->state = PROCESS_RUNNING;
+    strcpy_local(current_process->name, "kernel");
+    current_process->stack = NULL;  // Kernel uses current stack
+    current_process->next = NULL;
     
-    terminal_writestring("[PROCESS] Process management system initialized\n");
-    terminal_printf("[PROCESS] Kernel process created (PID: %d)\n", current_process->pid);
+    terminal_writestring("[PROCESS] Minimal process system initialized\n");
+    terminal_printf("[PROCESS] Kernel process ready (PID: %d)\n", current_process->pid);
 }
 
-// Create a new process
-process_t* process_create(const char* name, void (*entry_point)(void), process_priority_t priority) {
+// Create a new process (minimal implementation)
+int process_create(void (*entry_point)(void), const char* name) {
     // Find free slot in process table
-    uint32_t pid = 0;
-    for (uint32_t i = 1; i < MAX_PROCESSES; i++) {
-        if (process_table[i] == NULL) {
-            pid = i;
+    int slot = INVALID_PID;
+    for (int i = FIRST_USER_PID; i < MAX_PROCESSES; i++) {
+        if (process_table[i].pid == INVALID_PID) {
+            slot = i;
             break;
         }
     }
     
-    if (pid == 0) {
+    if (slot == INVALID_PID) {
         terminal_writestring("[PROCESS] ERROR: Process table full\n");
-        return NULL;
-    }
-    
-    // Allocate process control block
-    process_t* process = (process_t*)kmalloc(sizeof(process_t));
-    if (!process) {
-        terminal_writestring("[PROCESS] ERROR: Failed to allocate PCB\n");
-        return NULL;
+        return INVALID_PID;
     }
     
     // Initialize process
-    process->pid = pid;
-    strncpy(process->name, name, 31);
-    process->name[31] = '\0';
+    process_t* process = &process_table[slot];
+    process->pid = next_pid++;
     process->state = PROCESS_READY;
-    process->priority = priority;
+    strcpy_local(process->name, name);
     
-    // Initialize CPU context
-    memset(&process->context, 0, sizeof(cpu_context_t));
-    
-    // Set up stack
-    process->stack_size = DEFAULT_STACK_SIZE;
-    process->stack_base = (uint32_t)kmalloc(process->stack_size);
-    if (!process->stack_base) {
+    // Allocate stack
+    process->stack = kmalloc(STACK_SIZE);
+    if (!process->stack) {
         terminal_writestring("[PROCESS] ERROR: Failed to allocate stack\n");
-        kfree(process);
-        return NULL;
+        process->pid = INVALID_PID;
+        return INVALID_PID;
     }
     
-    // Initialize stack pointer (stack grows downward)
-    process->context.esp = process->stack_base + process->stack_size - 4;
+    // Initialize context (minimal)
+    process->context.esp = (uint32_t)process->stack + STACK_SIZE - 4;
     process->context.ebp = process->context.esp;
+    process->context.eip = (uint32_t)entry_point;
+    process->context.eflags = DEFAULT_EFLAGS;
     
-    // Set entry point
-    if (entry_point) {
-        process->context.eip = (uint32_t)entry_point;
-    }
-    
-    // Set default flags (interrupts enabled)
-    process->context.eflags = 0x202;
-    
-    // Initialize memory management
-    process->page_directory = current_page_directory;
-    process->context.cr3 = (uint32_t)process->page_directory;
-    process->heap_start = 0;
-    process->heap_end = 0;
-    
-    // Initialize scheduling
-    process->time_slice = DEFAULT_TIME_SLICE;
-    process->cpu_time = 0;
-    
-    // Initialize process tree
-    process->parent = current_process;
-    process->children = NULL;
-    process->next_sibling = NULL;
-    
-    // Initialize linked list pointers
+    // Add to ready queue
     process->next = NULL;
-    process->prev = NULL;
-    
-    // Add to process table
-    process_table[pid] = process;
-    
-    // Add to scheduler if not kernel process
-    if (entry_point) {
-        scheduler_add_process(process);
-    }
-    
-    terminal_printf("[PROCESS] Created process '%s' (PID: %d)\n", name, pid);
-    return process;
-}
-
-// Terminate a process
-void process_terminate(process_t* process) {
-    if (!process) return;
-    
-    terminal_printf("[PROCESS] Terminating process '%s' (PID: %d)\n", 
-                   process->name, process->pid);
-    
-    // Remove from scheduler
-    scheduler_remove_process(process);
-    
-    // Free memory
-    if (process->stack_base) {
-        kfree((void*)process->stack_base);
-    }
-    
-    // Remove from process table
-    process_table[process->pid] = NULL;
-    
-    // Mark as terminated
-    process->state = PROCESS_TERMINATED;
-    
-    // Free PCB
-    kfree(process);
-}
-
-// Exit current process
-void process_exit(void) {
-    if (current_process && current_process->pid != 0) {
-        process_terminate(current_process);
-        yield(); // Switch to another process
-    }
-}
-
-// Get process by PID
-process_t* process_get_by_pid(uint32_t pid) {
-    if (pid >= MAX_PROCESSES) return NULL;
-    return process_table[pid];
-}
-
-// Initialize scheduler
-void scheduler_init(void) {
-    ready_queue_head = NULL;
-    ready_queue_tail = NULL;
-    terminal_writestring("[SCHEDULER] Round-robin scheduler initialized\n");
-}
-
-// Add process to ready queue
-void scheduler_add_process(process_t* process) {
-    if (!process) return;
-    
-    process->state = PROCESS_READY;
-    process->next = NULL;
-    process->prev = ready_queue_tail;
-    
     if (ready_queue_tail) {
         ready_queue_tail->next = process;
     } else {
@@ -181,90 +91,89 @@ void scheduler_add_process(process_t* process) {
     }
     ready_queue_tail = process;
     
-    terminal_printf("[SCHEDULER] Added process '%s' to ready queue\n", process->name);
+    terminal_printf("[PROCESS] Created process '%s' (PID: %d)\n", name, process->pid);
+    return process->pid;
 }
 
-// Remove process from ready queue
-void scheduler_remove_process(process_t* process) {
-    if (!process) return;
-    
-    // Remove from linked list
-    if (process->prev) {
-        process->prev->next = process->next;
-    } else {
-        ready_queue_head = process->next;
-    }
-    
-    if (process->next) {
-        process->next->prev = process->prev;
-    } else {
-        ready_queue_tail = process->prev;
-    }
-    
-    process->next = NULL;
-    process->prev = NULL;
-    
-    terminal_printf("[SCHEDULER] Removed process '%s' from ready queue\n", process->name);
-}
-
-// Schedule next process (Round-robin)
-void schedule(void) {
+// Simple process switch (round-robin)
+void process_switch(void) {
     if (!ready_queue_head) {
-        return; // No processes to schedule
+        return; // No processes to switch to
     }
     
-    // Save current process state
-    if (current_process && current_process->state == PROCESS_RUNNING) {
-        current_process->state = PROCESS_READY;
-        if (current_process->pid != 0) { // Don't add kernel process to queue
-            scheduler_add_process(current_process);
-        }
-    }
-    
-    // Get next process from ready queue
+    // Get next process from queue
     process_t* next_process = ready_queue_head;
-    scheduler_remove_process(next_process);
+    ready_queue_head = ready_queue_head->next;
+    
+    if (!ready_queue_head) {
+        ready_queue_tail = NULL;
+    }
+    
+    // Add current process back to queue (if not kernel)
+    if (current_process && current_process->pid != KERNEL_PID) {
+        current_process->state = PROCESS_READY;
+        current_process->next = NULL;
+        
+        if (ready_queue_tail) {
+            ready_queue_tail->next = current_process;
+        } else {
+            ready_queue_head = current_process;
+        }
+        ready_queue_tail = current_process;
+    }
     
     // Switch to next process
     process_t* old_process = current_process;
     current_process = next_process;
     current_process->state = PROCESS_RUNNING;
     
-    terminal_printf("[SCHEDULER] Switching from PID %d to PID %d\n", 
+    terminal_printf("[PROCESS] Switch: PID %d -> PID %d\n", 
                    old_process ? old_process->pid : 0, current_process->pid);
     
-    // Perform context switch
+    // Context switch (assembly function)
     if (old_process) {
-        context_switch(&old_process->context, &current_process->context);
+        switch_context(&old_process->context, &current_process->context);
     }
 }
 
-// Yield CPU to another process
-void yield(void) {
-    schedule();
+// Yield CPU 
+void process_yield(void) {
+    process_switch();
 }
 
-// Print process information
-void process_print_info(process_t* process) {
-    if (!process) return;
-    
-    const char* state_names[] = {"READY", "RUNNING", "BLOCKED", "TERMINATED"};
-    const char* priority_names[] = {"HIGH", "NORMAL", "LOW"};
-    
-    terminal_printf("PID: %d | Name: %s | State: %s | Priority: %s | CPU Time: %d\n",
-                   process->pid, process->name, 
-                   state_names[process->state], priority_names[process->priority],
-                   process->cpu_time);
+// Exit current process
+void process_exit(void) {
+    if (current_process && current_process->pid != KERNEL_PID) {
+        terminal_printf("[PROCESS] Process %d exiting\n", current_process->pid);
+        
+        // Free stack
+        if (current_process->stack) {
+            kfree(current_process->stack);
+        }
+        
+        // Mark as terminated
+        current_process->pid = INVALID_PID;
+        current_process->state = PROCESS_TERMINATED;
+        current_process->stack = NULL;
+        
+        // Switch to next process
+        process_switch();
+    }
 }
 
 // List all processes
-void process_list_all(void) {
+void process_list(void) {
     terminal_writestring("\n=== Process List ===\n");
     
-    uint32_t count = 0;
-    for (uint32_t i = 0; i < MAX_PROCESSES; i++) {
-        if (process_table[i]) {
-            process_print_info(process_table[i]);
+    const char* state_names[] = {"READY", "RUNNING", "TERMINATED"};
+    int count = 0;
+    
+    for (int i = 0; i < MAX_PROCESSES; i++) {
+        if (process_table[i].pid != INVALID_PID) {
+            terminal_printf("PID: %d | Name: %s | State: %s\n",
+                           process_table[i].pid, 
+                           process_table[i].name,
+                           state_names[process_table[i].state]);
             count++;
         }
     }

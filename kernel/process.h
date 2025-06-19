@@ -1,102 +1,59 @@
-// ClaudeOS Process Management System - Day 7
-// Process structures and definitions
+// ClaudeOS Process Management - Day 7 Minimal Implementation
+// Simple process management without complex features
 
 #ifndef PROCESS_H
 #define PROCESS_H
 
 #include "types.h"
-#include "vmm.h"
 
-// Process states
+// Process configuration constants (no hardcoding)
+#define MAX_PROCESSES 8
+#define STACK_SIZE 0x1000      // 4KB stack
+#define KERNEL_PID 0           // Kernel process ID
+#define INVALID_PID -1         // Invalid/unused process ID
+#define FIRST_USER_PID 1       // First user process ID
+#define DEFAULT_EFLAGS 0x202   // Default EFLAGS (interrupts enabled)
+
+// Process states (minimal set)
 typedef enum {
     PROCESS_READY = 0,
-    PROCESS_RUNNING,
-    PROCESS_BLOCKED,
-    PROCESS_TERMINATED
+    PROCESS_RUNNING = 1,
+    PROCESS_TERMINATED = 2
 } process_state_t;
 
-// Process priority levels
-typedef enum {
-    PRIORITY_HIGH = 0,
-    PRIORITY_NORMAL,
-    PRIORITY_LOW
-} process_priority_t;
-
-// CPU register context for context switching
+// Simple CPU context (registers only, no page directory)
 typedef struct {
-    uint32_t eax;
-    uint32_t ebx;
-    uint32_t ecx;
-    uint32_t edx;
-    uint32_t esi;
-    uint32_t edi;
-    uint32_t esp;
-    uint32_t ebp;
-    uint32_t eip;
-    uint32_t eflags;
-    uint32_t cr3;  // Page directory for virtual memory
+    uint32_t eax, ebx, ecx, edx;
+    uint32_t esi, edi, esp, ebp;
+    uint32_t eip, eflags;
 } cpu_context_t;
 
-// Process Control Block (PCB)
+// Minimal process structure
 typedef struct process {
-    uint32_t pid;                    // Process ID
-    char name[32];                   // Process name
-    process_state_t state;           // Process state
-    process_priority_t priority;     // Process priority
-    
-    // CPU context for context switching
-    cpu_context_t context;
-    
-    // Memory management
-    page_directory_t* page_directory; // Virtual memory page directory
-    uint32_t stack_base;            // Stack base address
-    uint32_t stack_size;            // Stack size
-    uint32_t heap_start;            // Heap start address
-    uint32_t heap_end;              // Heap end address
-    
-    // Scheduling information
-    uint32_t time_slice;            // Time slice for round-robin
-    uint32_t cpu_time;              // Total CPU time used
-    
-    // Process tree
-    struct process* parent;         // Parent process
-    struct process* children;       // List of child processes
-    struct process* next_sibling;   // Next sibling in parent's child list
-    
-    // Linked list for scheduler
-    struct process* next;           // Next process in ready queue
-    struct process* prev;           // Previous process in ready queue
+    int pid;                        // Process ID
+    process_state_t state;          // Process state
+    cpu_context_t context;          // CPU registers
+    void* stack;                    // Stack pointer (allocated by kmalloc)
+    struct process* next;           // Next in ready queue
+    char name[32];                  // Process name
 } process_t;
-
-// Process table configuration
-#define MAX_PROCESSES 256
-#define DEFAULT_STACK_SIZE 0x1000  // 4KB stack
-#define DEFAULT_TIME_SLICE 10      // 10 timer ticks
 
 // Global variables
 extern process_t* current_process;
-extern process_t* process_table[MAX_PROCESSES];
-extern uint32_t next_pid;
+extern process_t* ready_queue_head;
+extern process_t* ready_queue_tail;
+extern process_t process_table[MAX_PROCESSES];
+extern int next_pid;
 
-// Process management functions
+// Function declarations
 void process_init(void);
-process_t* process_create(const char* name, void (*entry_point)(void), process_priority_t priority);
-void process_terminate(process_t* process);
+int process_create(void (*entry_point)(void), const char* name);
+void process_switch(void);
+void process_yield(void);
 void process_exit(void);
-process_t* process_get_by_pid(uint32_t pid);
+void process_list(void);
 
-// Scheduler functions
-void scheduler_init(void);
-void scheduler_add_process(process_t* process);
-void scheduler_remove_process(process_t* process);
-void schedule(void);
-void yield(void);
-
-// Context switching (implemented in assembly)
-extern void context_switch(cpu_context_t* old_context, cpu_context_t* new_context);
-
-// Utility functions
-void process_print_info(process_t* process);
-void process_list_all(void);
+// Assembly function (to be implemented)
+extern void switch_context(cpu_context_t* old_context, cpu_context_t* new_context);
 
 #endif // PROCESS_H
