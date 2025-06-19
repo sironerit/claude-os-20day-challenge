@@ -20,4 +20,7 @@ int strncmp(const char* str1, const char* str2, size_t count);
 char* strcat(char* dest, const char* src);
 char* strchr(const char* str, int character);
 
+// Number conversion
+char* itoa(int value, char* str, int base);
+
 #endif // STRING_H

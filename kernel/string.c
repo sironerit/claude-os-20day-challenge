@@ -176,3 +176,37 @@ char* strchr(const char* str, int character) {
     
     return NULL;
 }
+
+// Convert integer to string
+char* itoa(int value, char* str, int base) {
+    char* ptr = str;
+    char* ptr1 = str;
+    char tmp_char;
+    int tmp_value;
+    
+    // Handle negative numbers for base 10
+    if (value < 0 && base == 10) {
+        *ptr++ = '-';
+        value = -value;
+        ptr1++;
+    }
+    
+    // Convert number to string (reversed)
+    do {
+        tmp_value = value;
+        value /= base;
+        *ptr++ = "0123456789abcdef"[tmp_value - value * base];
+    } while (value);
+    
+    // Null terminate
+    *ptr-- = '\0';
+    
+    // Reverse string (excluding minus sign)
+    while (ptr1 < ptr) {
+        tmp_char = *ptr;
+        *ptr-- = *ptr1;
+        *ptr1++ = tmp_char;
+    }
+    
+    return str;
+}

@@ -16,32 +16,13 @@
 #include "syscall.h"
 #include "../fs/simplefs.h"
 #include "../drivers/ata.h"
+#include "shell.h"
 
 // VGA Text Mode Constants
 #define VGA_WIDTH 80
 #define VGA_HEIGHT 25
 #define VGA_MEMORY 0xB8000
 
-// VGA Color Codes
-typedef enum {
-    VGA_COLOR_BLACK = 0,
-    VGA_COLOR_BLUE = 1,
-    VGA_COLOR_GREEN = 2,
-    VGA_COLOR_CYAN = 3,
-    VGA_COLOR_RED = 4,
-    VGA_COLOR_MAGENTA = 5,
-    VGA_COLOR_BROWN = 6,
-    VGA_COLOR_LIGHT_GREY = 7,
-    VGA_COLOR_DARK_GREY = 8,
-    VGA_COLOR_LIGHT_BLUE = 9,
-    VGA_COLOR_LIGHT_GREEN = 10,
-    VGA_COLOR_LIGHT_CYAN = 11,
-    VGA_COLOR_LIGHT_RED = 12,
-    VGA_COLOR_LIGHT_MAGENTA = 13,
-    VGA_COLOR_LIGHT_BROWN = 14,
-    VGA_COLOR_WHITE = 15,
-    VGA_COLOR_YELLOW = 14,
-} vga_color;
 
 // Global variables
 static size_t terminal_row;
@@ -74,6 +55,18 @@ void terminal_initialize(void) {
             terminal_buffer[index] = vga_entry(' ', terminal_color);
         }
     }
+}
+
+void terminal_clear(void) {
+    // Clear screen and reset cursor
+    for (size_t y = 0; y < VGA_HEIGHT; y++) {
+        for (size_t x = 0; x < VGA_WIDTH; x++) {
+            const size_t index = y * VGA_WIDTH + x;
+            terminal_buffer[index] = vga_entry(' ', terminal_color);
+        }
+    }
+    terminal_column = 0;
+    terminal_row = 0;
 }
 
 void terminal_setcolor(uint8_t color) {
@@ -485,10 +478,19 @@ void kernel_main(void) {
         for (volatile int j = 0; j < 1000000; j++);
     }
     
-    terminal_writestring("Scheduler demonstration complete.\n");
+    terminal_writestring("Scheduler demonstration complete.\n\n");
     
-    // Kernel idle loop
+    // Initialize and start shell (Day 11 Phase 1)
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+    terminal_writestring("Starting ClaudeOS Shell...\n");
+    shell_init();
+    
+    // Shell main loop with keyboard input processing
     while (1) {
+        if (keyboard_has_input()) {
+            char c = keyboard_get_char();
+            shell_process_input(c);
+        }
         asm volatile ("hlt");
     }
 }
