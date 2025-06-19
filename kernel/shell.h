@@ -24,4 +24,15 @@ void cmd_clear(void);
 void cmd_version(void);
 void cmd_uptime(void);
 
+// File system commands (Phase 2)
+void cmd_ls(const char* path);
+void cmd_cat(const char* filename);
+void cmd_create(const char* filename);
+void cmd_delete(const char* filename);
+
+// Directory commands (Phase 3)
+void cmd_mkdir(const char* dirname);
+void cmd_rmdir(const char* dirname);
+void cmd_cd(const char* dirname);
+
 #endif // SHELL_H

@@ -5,6 +5,8 @@
 #include "kernel.h"
 #include "string.h"
 #include "timer.h"
+#include "syscall.h"
+#include "../fs/simplefs.h"
 
 // Shell state
 static char shell_buffer[SHELL_BUFFER_SIZE];
@@ -75,6 +77,33 @@ void shell_process_input(char c) {
     }
 }
 
+// Parse command and arguments
+static void parse_command(const char* input, char* cmd, char* arg) {
+    // Skip leading whitespace
+    while (*input == ' ' || *input == '\t') {
+        input++;
+    }
+    
+    // Extract command
+    int cmd_pos = 0;
+    while (*input && *input != ' ' && *input != '\t' && cmd_pos < 63) {
+        cmd[cmd_pos++] = *input++;
+    }
+    cmd[cmd_pos] = '\0';
+    
+    // Skip whitespace between command and argument
+    while (*input == ' ' || *input == '\t') {
+        input++;
+    }
+    
+    // Extract first argument
+    int arg_pos = 0;
+    while (*input && arg_pos < 127) {
+        arg[arg_pos++] = *input++;
+    }
+    arg[arg_pos] = '\0';
+}
+
 // Execute shell command
 void shell_execute_command(const char* command) {
     // Remove leading/trailing whitespace
@@ -86,19 +115,72 @@ void shell_execute_command(const char* command) {
         return;
     }
     
-    // Built-in commands (Phase 1 - safe commands only)
-    if (strcmp(command, "help") == 0) {
+    // Parse command and argument
+    char cmd[64];
+    char arg[128];
+    parse_command(command, cmd, arg);
+    
+    // Phase 1 commands (basic system)
+    if (strcmp(cmd, "help") == 0) {
         cmd_help();
-    } else if (strcmp(command, "clear") == 0) {
+    } else if (strcmp(cmd, "clear") == 0) {
         cmd_clear();
-    } else if (strcmp(command, "version") == 0) {
+    } else if (strcmp(cmd, "version") == 0) {
         cmd_version();
-    } else if (strcmp(command, "uptime") == 0) {
+    } else if (strcmp(cmd, "uptime") == 0) {
         cmd_uptime();
+    } 
+    // Phase 2 commands (file operations)
+    else if (strcmp(cmd, "ls") == 0) {
+        cmd_ls(strlen(arg) > 0 ? arg : "/");
+    } else if (strcmp(cmd, "cat") == 0) {
+        if (strlen(arg) > 0) {
+            cmd_cat(arg);
+        } else {
+            terminal_setcolor(VGA_COLOR_LIGHT_RED);
+            terminal_writestring("Usage: cat <filename>\n");
+            terminal_setcolor(VGA_COLOR_WHITE);
+        }
+    } else if (strcmp(cmd, "create") == 0) {
+        if (strlen(arg) > 0) {
+            cmd_create(arg);
+        } else {
+            terminal_setcolor(VGA_COLOR_LIGHT_RED);
+            terminal_writestring("Usage: create <filename>\n");
+            terminal_setcolor(VGA_COLOR_WHITE);
+        }
+    } else if (strcmp(cmd, "delete") == 0) {
+        if (strlen(arg) > 0) {
+            cmd_delete(arg);
+        } else {
+            terminal_setcolor(VGA_COLOR_LIGHT_RED);
+            terminal_writestring("Usage: delete <filename>\n");
+            terminal_setcolor(VGA_COLOR_WHITE);
+        }
+    }
+    // Phase 3 commands (directory operations)
+    else if (strcmp(cmd, "mkdir") == 0) {
+        if (strlen(arg) > 0) {
+            cmd_mkdir(arg);
+        } else {
+            terminal_setcolor(VGA_COLOR_LIGHT_RED);
+            terminal_writestring("Usage: mkdir <dirname>\n");
+            terminal_setcolor(VGA_COLOR_WHITE);
+        }
+    } else if (strcmp(cmd, "rmdir") == 0) {
+        if (strlen(arg) > 0) {
+            cmd_rmdir(arg);
+        } else {
+            terminal_setcolor(VGA_COLOR_LIGHT_RED);
+            terminal_writestring("Usage: rmdir <dirname>\n");
+            terminal_setcolor(VGA_COLOR_WHITE);
+        }
+    } else if (strcmp(cmd, "cd") == 0) {
+        cmd_cd(strlen(arg) > 0 ? arg : "/");
     } else {
         terminal_setcolor(VGA_COLOR_LIGHT_RED);
         terminal_writestring("Command not found: ");
-        terminal_writestring(command);
+        terminal_writestring(cmd);
         terminal_writestring("\nType 'help' for available commands.\n");
         terminal_setcolor(VGA_COLOR_WHITE);
     }
@@ -107,13 +189,33 @@ void shell_execute_command(const char* command) {
 // Built-in command implementations
 void cmd_help(void) {
     terminal_setcolor(VGA_COLOR_LIGHT_CYAN);
-    terminal_writestring("ClaudeOS Shell - Available Commands:\n");
+    terminal_writestring("ClaudeOS Shell - Available Commands:\n\n");
+    terminal_setcolor(VGA_COLOR_YELLOW);
+    terminal_writestring("System Commands:\n");
     terminal_setcolor(VGA_COLOR_WHITE);
-    terminal_writestring("  help     - Show this help message\n");
-    terminal_writestring("  clear    - Clear the screen\n");
-    terminal_writestring("  version  - Show OS version information\n");
-    terminal_writestring("  uptime   - Show system uptime\n");
-    terminal_writestring("\nMore commands coming in future updates!\n");
+    terminal_writestring("  help           - Show this help message\n");
+    terminal_writestring("  clear          - Clear the screen\n");
+    terminal_writestring("  version        - Show OS version information\n");
+    terminal_writestring("  uptime         - Show system uptime\n\n");
+    
+    terminal_setcolor(VGA_COLOR_YELLOW);
+    terminal_writestring("File Operations:\n");
+    terminal_setcolor(VGA_COLOR_WHITE);
+    terminal_writestring("  ls [path]      - List directory contents\n");
+    terminal_writestring("  cat <file>     - Display file contents\n");
+    terminal_writestring("  create <file>  - Create a new file\n");
+    terminal_writestring("  delete <file>  - Delete a file\n\n");
+    
+    terminal_setcolor(VGA_COLOR_YELLOW);
+    terminal_writestring("Directory Operations:\n");
+    terminal_setcolor(VGA_COLOR_WHITE);
+    terminal_writestring("  mkdir <dir>    - Create directory\n");
+    terminal_writestring("  rmdir <dir>    - Remove directory\n");
+    terminal_writestring("  cd [dir]       - Change directory\n\n");
+    
+    terminal_setcolor(VGA_COLOR_LIGHT_GREEN);
+    terminal_writestring("Day 11: Complete Command Shell System!\n");
+    terminal_setcolor(VGA_COLOR_WHITE);
 }
 
 void cmd_clear(void) {
@@ -165,4 +267,211 @@ void cmd_uptime(void) {
     itoa(seconds, sec_str, 10);
     terminal_writestring(sec_str);
     terminal_writestring("s\n");
+}
+
+// ====== Phase 2: File System Commands ======
+
+// List directory contents
+void cmd_ls(const char* path) {
+    terminal_setcolor(VGA_COLOR_LIGHT_CYAN);
+    terminal_writestring("Directory listing for: ");
+    terminal_writestring(path);
+    terminal_writestring("\n");
+    terminal_setcolor(VGA_COLOR_WHITE);
+    
+    // Use file system list syscall
+    syscall_list(path);
+}
+
+// Display file contents
+void cmd_cat(const char* filename) {
+    terminal_setcolor(VGA_COLOR_LIGHT_CYAN);
+    terminal_writestring("Contents of: ");
+    terminal_writestring(filename);
+    terminal_writestring("\n");
+    terminal_setcolor(VGA_COLOR_LIGHT_GREY);
+    terminal_writestring("----------------------------------------\n");
+    terminal_setcolor(VGA_COLOR_WHITE);
+    
+    // Open file for reading
+    int fd = syscall_open(filename, O_READ);
+    if (fd < 0) {
+        terminal_setcolor(VGA_COLOR_LIGHT_RED);
+        terminal_writestring("Error: Could not open file '");
+        terminal_writestring(filename);
+        terminal_writestring("'\n");
+        terminal_setcolor(VGA_COLOR_WHITE);
+        return;
+    }
+    
+    // Read and display file contents
+    char buffer[1024];
+    int bytes_read = syscall_read_file(fd, buffer, 1023);
+    if (bytes_read > 0) {
+        buffer[bytes_read] = '\0';
+        terminal_writestring(buffer);
+        if (buffer[bytes_read-1] != '\n') {
+            terminal_writestring("\n");
+        }
+    } else {
+        terminal_setcolor(VGA_COLOR_YELLOW);
+        terminal_writestring("(File is empty)\n");
+        terminal_setcolor(VGA_COLOR_WHITE);
+    }
+    
+    syscall_close(fd);
+    terminal_setcolor(VGA_COLOR_LIGHT_GREY);
+    terminal_writestring("----------------------------------------\n");
+    terminal_setcolor(VGA_COLOR_WHITE);
+}
+
+// Create a new file
+void cmd_create(const char* filename) {
+    terminal_setcolor(VGA_COLOR_LIGHT_CYAN);
+    terminal_writestring("Creating file: ");
+    terminal_writestring(filename);
+    terminal_writestring("\n");
+    terminal_setcolor(VGA_COLOR_WHITE);
+    
+    // Create file with write mode
+    int fd = syscall_open(filename, O_CREATE | O_WRITE);
+    if (fd < 0) {
+        terminal_setcolor(VGA_COLOR_LIGHT_RED);
+        terminal_writestring("Error: Could not create file '");
+        terminal_writestring(filename);
+        terminal_writestring("'\n");
+        terminal_setcolor(VGA_COLOR_WHITE);
+        return;
+    }
+    
+    // Write default content
+    const char* default_content = "File created by ClaudeOS Shell\nEdit this file with your content.\n";
+    int bytes_written = syscall_write_file(fd, default_content, strlen(default_content));
+    syscall_close(fd);
+    
+    if (bytes_written > 0) {
+        terminal_setcolor(VGA_COLOR_LIGHT_GREEN);
+        terminal_writestring("File '");
+        terminal_writestring(filename);
+        terminal_writestring("' created successfully!\n");
+        terminal_setcolor(VGA_COLOR_WHITE);
+    } else {
+        terminal_setcolor(VGA_COLOR_LIGHT_RED);
+        terminal_writestring("Error: Could not write to file\n");
+        terminal_setcolor(VGA_COLOR_WHITE);
+    }
+}
+
+// Delete a file
+void cmd_delete(const char* filename) {
+    terminal_setcolor(VGA_COLOR_YELLOW);
+    terminal_writestring("Deleting file: ");
+    terminal_writestring(filename);
+    terminal_writestring("\n");
+    terminal_setcolor(VGA_COLOR_WHITE);
+    
+    // Use file system delete syscall
+    int result = syscall_delete(filename);
+    if (result == FS_SUCCESS) {
+        terminal_setcolor(VGA_COLOR_LIGHT_GREEN);
+        terminal_writestring("File '");
+        terminal_writestring(filename);
+        terminal_writestring("' deleted successfully!\n");
+        terminal_setcolor(VGA_COLOR_WHITE);
+    } else {
+        terminal_setcolor(VGA_COLOR_LIGHT_RED);
+        terminal_writestring("Error: Could not delete file '");
+        terminal_writestring(filename);
+        terminal_writestring("'\n");
+        terminal_setcolor(VGA_COLOR_WHITE);
+    }
+}
+
+// ====== Phase 3: Directory Commands ======
+
+// Shell state for current directory
+static char current_directory[256] = "/";
+
+// Create directory
+void cmd_mkdir(const char* dirname) {
+    terminal_setcolor(VGA_COLOR_LIGHT_CYAN);
+    terminal_writestring("Creating directory: ");
+    terminal_writestring(dirname);
+    terminal_writestring("\n");
+    terminal_setcolor(VGA_COLOR_WHITE);
+    
+    // Use file system mkdir syscall
+    int result = syscall_mkdir(dirname);
+    if (result == FS_SUCCESS) {
+        terminal_setcolor(VGA_COLOR_LIGHT_GREEN);
+        terminal_writestring("Directory '");
+        terminal_writestring(dirname);
+        terminal_writestring("' created successfully!\n");
+        terminal_setcolor(VGA_COLOR_WHITE);
+    } else {
+        terminal_setcolor(VGA_COLOR_LIGHT_RED);
+        terminal_writestring("Error: Could not create directory '");
+        terminal_writestring(dirname);
+        terminal_writestring("'\n");
+        terminal_setcolor(VGA_COLOR_WHITE);
+    }
+}
+
+// Remove directory
+void cmd_rmdir(const char* dirname) {
+    terminal_setcolor(VGA_COLOR_YELLOW);
+    terminal_writestring("Removing directory: ");
+    terminal_writestring(dirname);
+    terminal_writestring("\n");
+    terminal_setcolor(VGA_COLOR_WHITE);
+    
+    // Use file system delete syscall (works for directories too)
+    int result = syscall_delete(dirname);
+    if (result == FS_SUCCESS) {
+        terminal_setcolor(VGA_COLOR_LIGHT_GREEN);
+        terminal_writestring("Directory '");
+        terminal_writestring(dirname);
+        terminal_writestring("' removed successfully!\n");
+        terminal_setcolor(VGA_COLOR_WHITE);
+    } else {
+        terminal_setcolor(VGA_COLOR_LIGHT_RED);
+        terminal_writestring("Error: Could not remove directory '");
+        terminal_writestring(dirname);
+        terminal_writestring("'\n");
+        terminal_setcolor(VGA_COLOR_WHITE);
+    }
+}
+
+// Change directory (simplified - updates shell state)
+void cmd_cd(const char* dirname) {
+    if (strcmp(dirname, "/") == 0) {
+        strcpy(current_directory, "/");
+        terminal_setcolor(VGA_COLOR_LIGHT_GREEN);
+        terminal_writestring("Changed to root directory\n");
+        terminal_setcolor(VGA_COLOR_WHITE);
+    } else if (strcmp(dirname, "..") == 0) {
+        // Go to parent directory (simplified)
+        strcpy(current_directory, "/");
+        terminal_setcolor(VGA_COLOR_LIGHT_GREEN);
+        terminal_writestring("Changed to parent directory\n");
+        terminal_setcolor(VGA_COLOR_WHITE);
+    } else {
+        // For simplicity, we'll just update the current directory string
+        // In a full implementation, we'd verify the directory exists
+        if (dirname[0] == '/') {
+            strcpy(current_directory, dirname);
+        } else {
+            // Relative path - append to current directory
+            if (strcmp(current_directory, "/") != 0) {
+                strcat(current_directory, "/");
+            }
+            strcat(current_directory, dirname);
+        }
+        
+        terminal_setcolor(VGA_COLOR_LIGHT_GREEN);
+        terminal_writestring("Changed directory to: ");
+        terminal_writestring(current_directory);
+        terminal_writestring("\n");
+        terminal_setcolor(VGA_COLOR_WHITE);
+    }
 }
