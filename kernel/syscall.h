@@ -12,8 +12,15 @@
 #define SYS_GETPID 2  // Get process ID
 #define SYS_YIELD  3  // Yield CPU to other processes
 
-// Maximum number of system calls (minimal set)
-#define MAX_SYSCALLS 4
+// Day 9: File system system calls
+#define SYS_OPEN   4  // Open file
+#define SYS_CLOSE  5  // Close file
+#define SYS_READ   6  // Read from file
+#define SYS_WRITE_FILE 7  // Write to file
+#define SYS_LIST   8  // List files
+
+// Maximum number of system calls (Day 9 expanded)
+#define MAX_SYSCALLS 9
 
 // System call return codes
 #define SYSCALL_SUCCESS  0
@@ -35,11 +42,25 @@ int sys_write(uint32_t str_ptr, uint32_t arg2, uint32_t arg3);
 int sys_getpid(uint32_t arg1, uint32_t arg2, uint32_t arg3);
 int sys_yield(uint32_t arg1, uint32_t arg2, uint32_t arg3);
 
+// Day 9: File system system call implementations
+int sys_open(uint32_t filename_ptr, uint32_t mode, uint32_t arg3);
+int sys_close(uint32_t fd, uint32_t arg2, uint32_t arg3);
+int sys_read(uint32_t fd, uint32_t buffer_ptr, uint32_t count);
+int sys_write_file(uint32_t fd, uint32_t buffer_ptr, uint32_t count);
+int sys_list(uint32_t arg1, uint32_t arg2, uint32_t arg3);
+
 // C wrapper functions
 int syscall_hello(void);
 int syscall_write(const char* str);
 int syscall_getpid(void);
 int syscall_yield(void);
+
+// Day 9: File system wrapper functions
+int syscall_open(const char* filename, int mode);
+int syscall_close(int fd);
+int syscall_read(int fd, void* buffer, size_t count);
+int syscall_write_file(int fd, const void* buffer, size_t count);
+int syscall_list(void);
 
 // System call initialization
 void syscall_init(void);

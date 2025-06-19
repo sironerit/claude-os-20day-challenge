@@ -14,6 +14,9 @@ typedef signed long long int64_t;
 
 typedef uint32_t size_t;
 
+// Boolean type
+typedef enum { false = 0, true = 1 } bool;
+
 #ifndef NULL
 #define NULL ((void*)0)
 #endif

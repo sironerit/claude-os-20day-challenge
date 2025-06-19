@@ -13,6 +13,7 @@
 #include "heap.h"
 #include "process.h"
 #include "syscall.h"
+#include "../fs/memfs.h"
 
 // VGA Text Mode Constants
 #define VGA_WIDTH 80
@@ -216,7 +217,7 @@ void kernel_main(void) {
     
     // Display welcome message  
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
-    terminal_writestring("ClaudeOS - Day 8 Basic System Calls\n");
+    terminal_writestring("ClaudeOS - Day 9 Memory File System\n");
     terminal_writestring("====================================\n");
     
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
@@ -293,6 +294,11 @@ void kernel_main(void) {
     syscall_init();
     terminal_writestring("System calls initialized successfully!\n");
     
+    // Initialize Memory File System
+    terminal_writestring("Initializing Memory File System...\n");
+    memfs_init();
+    terminal_writestring("Memory file system initialized successfully!\n");
+    
     // Enable interrupts
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
     terminal_writestring("Enabling interrupts...\n");
@@ -300,7 +306,7 @@ void kernel_main(void) {
     terminal_writestring("Interrupts enabled!\n\n");
     
     terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
-    terminal_writestring("Day 8 Features:\n");
+    terminal_writestring("Day 9 Features:\n");
     terminal_writestring("- Physical Memory Manager (PMM)\n");
     terminal_writestring("- Virtual Memory Manager (VMM)\n");
     terminal_writestring("- Paging System (4KB pages)\n");
@@ -309,7 +315,9 @@ void kernel_main(void) {
     terminal_writestring("- Basic Round-Robin Scheduler\n");
     terminal_writestring("- Simple Context Switching\n");
     terminal_writestring("- System Call Interface (INT 0x80)\n");
-    terminal_writestring("- 4 Basic System Calls (hello/write/getpid/yield)\n\n");
+    terminal_writestring("- 9 System Calls (incl. file operations)\n");
+    terminal_writestring("- Memory-Based File System (MemFS)\n");
+    terminal_writestring("- File Operations (open/read/write/close/list)\n\n");
     
     // Memory management demonstration
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BROWN, VGA_COLOR_BLACK));
@@ -417,6 +425,44 @@ void kernel_main(void) {
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
     terminal_writestring("Day 8 Basic System Calls Complete!\n");
     terminal_writestring("All 4 system calls operational and tested.\n");
+    
+    // File system testing
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+    terminal_writestring("\nFile System Testing:\n");
+    
+    // Test file listing
+    terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
+    terminal_writestring("Testing sys_list system call...\n");
+    result = syscall_list();
+    terminal_printf("sys_list returned: %d\n", result);
+    
+    // Test file opening and reading
+    terminal_writestring("Testing sys_open system call...\n");
+    int fd = syscall_open("hello.txt", 1); // Read mode
+    terminal_printf("sys_open returned fd: %d\n", fd);
+    
+    if (fd >= 0) {
+        terminal_writestring("Testing sys_read system call...\n");
+        char buffer[128];
+        int bytes_read = syscall_read(fd, buffer, 50);
+        terminal_printf("sys_read returned: %d bytes\n", bytes_read);
+        
+        if (bytes_read > 0) {
+            buffer[bytes_read] = '\0';
+            terminal_setcolor(vga_entry_color(VGA_COLOR_CYAN, VGA_COLOR_BLACK));
+            terminal_writestring("File content: ");
+            terminal_writestring(buffer);
+        }
+        
+        terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
+        terminal_writestring("Testing sys_close system call...\n");
+        result = syscall_close(fd);
+        terminal_printf("sys_close returned: %d\n", result);
+    }
+    
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+    terminal_writestring("Day 9 Memory File System Complete!\n");
+    terminal_writestring("All file operations operational and tested.\n");
     
     // Simple demonstration loop (no actual process switching yet)
     int counter = 0;

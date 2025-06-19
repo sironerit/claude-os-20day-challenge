@@ -4,6 +4,7 @@
 #include "syscall.h"
 #include "kernel.h"
 #include "process.h"
+#include "../fs/memfs.h"
 
 // Simple string function for syscalls
 static size_t syscall_strlen(const char* str) {
@@ -17,12 +18,17 @@ static inline uint8_t vga_entry_color(vga_color fg, vga_color bg) {
     return fg | bg << 4;
 }
 
-// System call dispatch table (minimal set)
+// System call dispatch table (Day 9 expanded)
 syscall_fn_t syscall_table[MAX_SYSCALLS] = {
-    sys_hello,     // SYS_HELLO (0)
-    sys_write,     // SYS_WRITE (1)
-    sys_getpid,    // SYS_GETPID (2)
-    sys_yield      // SYS_YIELD (3)
+    sys_hello,      // SYS_HELLO (0)
+    sys_write,      // SYS_WRITE (1)
+    sys_getpid,     // SYS_GETPID (2)
+    sys_yield,      // SYS_YIELD (3)
+    sys_open,       // SYS_OPEN (4)
+    sys_close,      // SYS_CLOSE (5)
+    sys_read,       // SYS_READ (6)
+    sys_write_file, // SYS_WRITE_FILE (7)
+    sys_list        // SYS_LIST (8)
 };
 
 // Main system call handler (called from assembly)
@@ -135,6 +141,94 @@ int syscall_yield(void) {
     return do_syscall(SYS_YIELD, 0, 0, 0);
 }
 
+// Day 9: File system wrapper functions
+int syscall_open(const char* filename, int mode) {
+    return do_syscall(SYS_OPEN, (uint32_t)filename, (uint32_t)mode, 0);
+}
+
+int syscall_close(int fd) {
+    return do_syscall(SYS_CLOSE, (uint32_t)fd, 0, 0);
+}
+
+int syscall_read(int fd, void* buffer, size_t count) {
+    return do_syscall(SYS_READ, (uint32_t)fd, (uint32_t)buffer, (uint32_t)count);
+}
+
+int syscall_write_file(int fd, const void* buffer, size_t count) {
+    return do_syscall(SYS_WRITE_FILE, (uint32_t)fd, (uint32_t)buffer, (uint32_t)count);
+}
+
+int syscall_list(void) {
+    return do_syscall(SYS_LIST, 0, 0, 0);
+}
+
+// Day 9: File system system call implementations
+
+// SYS_OPEN (4) - Open file
+int sys_open(uint32_t filename_ptr, uint32_t mode, uint32_t arg3) {
+    (void)arg3; // Suppress unused parameter warning
+    
+    // Basic pointer validation
+    if (filename_ptr == 0) {
+        return SYSCALL_ERROR;
+    }
+    
+    const char* filename = (const char*)filename_ptr;
+    uint8_t memfs_mode = 0;
+    
+    // Convert mode to memfs mode
+    if (mode & 1) memfs_mode |= MEMFS_MODE_READ;
+    if (mode & 2) memfs_mode |= MEMFS_MODE_WRITE;
+    if (mode & 4) memfs_mode |= MEMFS_MODE_APPEND;
+    
+    // Default to read if no mode specified
+    if (memfs_mode == 0) memfs_mode = MEMFS_MODE_READ;
+    
+    int result = memfs_open(filename, memfs_mode);
+    return result;
+}
+
+// SYS_CLOSE (5) - Close file
+int sys_close(uint32_t fd, uint32_t arg2, uint32_t arg3) {
+    (void)arg2; (void)arg3; // Suppress unused parameter warnings
+    
+    int result = memfs_close((int)fd);
+    return result;
+}
+
+// SYS_READ (6) - Read from file
+int sys_read(uint32_t fd, uint32_t buffer_ptr, uint32_t count) {
+    // Basic pointer validation
+    if (buffer_ptr == 0) {
+        return SYSCALL_ERROR;
+    }
+    
+    void* buffer = (void*)buffer_ptr;
+    int result = memfs_read((int)fd, buffer, (size_t)count);
+    return result;
+}
+
+// SYS_WRITE_FILE (7) - Write to file
+int sys_write_file(uint32_t fd, uint32_t buffer_ptr, uint32_t count) {
+    // Basic pointer validation
+    if (buffer_ptr == 0) {
+        return SYSCALL_ERROR;
+    }
+    
+    const void* buffer = (const void*)buffer_ptr;
+    int result = memfs_write((int)fd, buffer, (size_t)count);
+    return result;
+}
+
+// SYS_LIST (8) - List files
+int sys_list(uint32_t arg1, uint32_t arg2, uint32_t arg3) {
+    (void)arg1; (void)arg2; (void)arg3; // Suppress unused parameter warnings
+    
+    // List files to terminal
+    memfs_list_files();
+    return SYSCALL_SUCCESS;
+}
+
 
 // Initialize system call subsystem
 void syscall_init(void) {
@@ -145,5 +239,10 @@ void syscall_init(void) {
     terminal_writestring("[SYSCALL]   1: sys_write - Write string to terminal\n");
     terminal_writestring("[SYSCALL]   2: sys_getpid - Get process ID\n");
     terminal_writestring("[SYSCALL]   3: sys_yield - Yield CPU\n");
+    terminal_writestring("[SYSCALL]   4: sys_open - Open file\n");
+    terminal_writestring("[SYSCALL]   5: sys_close - Close file\n");
+    terminal_writestring("[SYSCALL]   6: sys_read - Read from file\n");
+    terminal_writestring("[SYSCALL]   7: sys_write_file - Write to file\n");
+    terminal_writestring("[SYSCALL]   8: sys_list - List files\n");
     terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
 }
