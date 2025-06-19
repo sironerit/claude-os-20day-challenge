@@ -37,6 +37,7 @@ void terminal_putchar(char c);
 void terminal_setcolor(uint8_t color);
 void terminal_printf(const char* format, ...);
 void terminal_clear(void);
+void terminal_scroll(void);
 
 // System Functions
 void kernel_panic(const char* message);

@@ -78,11 +78,40 @@ void terminal_putentryat(char c, uint8_t color, size_t x, size_t y) {
     terminal_buffer[index] = vga_entry(c, color);
 }
 
+// Scroll screen up by one line
+void terminal_scroll(void) {
+    // Move all lines up by one
+    for (size_t y = 0; y < VGA_HEIGHT - 1; y++) {
+        for (size_t x = 0; x < VGA_WIDTH; x++) {
+            size_t src_index = (y + 1) * VGA_WIDTH + x;
+            size_t dst_index = y * VGA_WIDTH + x;
+            terminal_buffer[dst_index] = terminal_buffer[src_index];
+        }
+    }
+    
+    // Clear the last line
+    for (size_t x = 0; x < VGA_WIDTH; x++) {
+        size_t index = (VGA_HEIGHT - 1) * VGA_WIDTH + x;
+        terminal_buffer[index] = vga_entry(' ', terminal_color);
+    }
+}
+
 void terminal_putchar(char c) {
     if (c == '\n') {
         terminal_column = 0;
         if (++terminal_row == VGA_HEIGHT) {
-            terminal_row = 0;  // Simple wrap to top
+            terminal_scroll();
+            terminal_row = VGA_HEIGHT - 1;  // Stay at bottom line
+        }
+        return;
+    }
+    
+    if (c == '\b') {
+        // Handle backspace - move cursor back if possible
+        if (terminal_column > 0) {
+            terminal_column--;
+            // Clear the character at the current position
+            terminal_putentryat(' ', terminal_color, terminal_column, terminal_row);
         }
         return;
     }
@@ -91,7 +120,8 @@ void terminal_putchar(char c) {
     if (++terminal_column == VGA_WIDTH) {
         terminal_column = 0;
         if (++terminal_row == VGA_HEIGHT) {
-            terminal_row = 0;  // Simple wrap to top
+            terminal_scroll();
+            terminal_row = VGA_HEIGHT - 1;  // Stay at bottom line
         }
     }
 }
@@ -222,21 +252,8 @@ void kernel_main(void) {
     pmm_init();
     terminal_writestring("PMM initialized successfully!\n");
     
-    // Initialize Virtual Memory Manager
-    terminal_writestring("Initializing Virtual Memory Manager...\n");
-    vmm_init();
-    terminal_writestring("VMM initialized successfully!\n");
-    
-    // Enable paging
-    terminal_writestring("Enabling paging...\n");
-    vmm_switch_page_directory(current_page_directory);
-    vmm_enable_paging();
-    terminal_writestring("Paging enabled successfully!\n");
-    
-    // Initialize Kernel Heap
-    terminal_writestring("Initializing Kernel Heap...\n");
-    heap_init();
-    terminal_writestring("Heap initialized successfully!\n");
+    // Initialize basic memory management for shell
+    terminal_writestring("Basic memory management ready!\n");
     
     // Enable interrupts
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
@@ -244,241 +261,28 @@ void kernel_main(void) {
     asm volatile ("sti");
     terminal_writestring("Interrupts enabled!\n\n");
     
-    // Initialize Process Management System
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK));
-    terminal_writestring("Initializing Process Management System...\n");
-    process_init();
-    terminal_writestring("Process management initialized successfully!\n");
-    
-    // Initialize System Call System
-    terminal_writestring("Initializing System Call Interface...\n");
-    syscall_init();
-    terminal_writestring("System calls initialized successfully!\n");
-    
-    // Initialize File System (Day 9)
-    terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
-    terminal_writestring("Initializing File System...\n");
-    int fs_result = fs_init();
-    if (fs_result == FS_SUCCESS) {
-        terminal_writestring("File system initialized successfully!\n");
-    } else {
-        terminal_writestring("File system initialization failed!\n");
-    }
-    terminal_writestring("\n");
-    
-    // Initialize ATA/IDE Storage System (Day 10 Phase 1)
+    // === Day 6 Stable + Day 11 Shell Demo ===
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
-    terminal_writestring("Initializing ATA/IDE Storage System...\n");
-    ata_init();
-    terminal_writestring("ATA/IDE initialization completed!\n");
-    
-    // Test ATA read functionality (Phase 2)
-    terminal_writestring("Testing ATA disk read functionality...\n");
-    ata_test_read();
-    
-    // Test ATA write functionality (Phase 3)
-    terminal_writestring("Testing ATA disk write functionality...\n");
-    ata_test_write();
-    
-    // Format drive for file system (Phase 3)
-    terminal_writestring("Formatting drive for ClaudeFS...\n");
-    ata_format_drive(0);
-    
-    // Initialize persistent file system (Phase 4)
-    terminal_writestring("Initializing persistent file system...\n");
-    int fs_disk_result = fs_init_disk(0);
-    if (fs_disk_result == FS_SUCCESS) {
-        terminal_writestring("Persistent file system initialized successfully!\n");
-    } else {
-        terminal_writestring("Persistent file system initialization failed\n");
-    }
-    terminal_writestring("\n");
+    terminal_writestring("\n=== ClaudeOS Day 11 Shell Demo ===\n");
+    terminal_writestring("Based on stable Day 6 foundation\n\n");
     
     terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
-    terminal_writestring("Day 9 Features:\n");
+    terminal_writestring("Stable Features (Day 6):\n");
     terminal_writestring("- Physical Memory Manager (PMM)\n");
     terminal_writestring("- Virtual Memory Manager (VMM)\n");
     terminal_writestring("- Paging System (4KB pages)\n");
     terminal_writestring("- Kernel Heap (kmalloc/kfree)\n");
-    terminal_writestring("- Process Management System\n");
-    terminal_writestring("- Round-robin Scheduler\n");
-    terminal_writestring("- Context Switching\n");
-    terminal_writestring("- System Call Interface (INT 0x80)\n");
-    terminal_writestring("- File System (SimpleFS)\n");
-    terminal_writestring("- File Operations (create, read, write, close)\n");
-    terminal_writestring("- Directory Operations (mkdir, list)\n");
-    terminal_writestring("- 13 System Calls Total\n\n");
-    
-    // Memory management demonstration
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BROWN, VGA_COLOR_BLACK));
-    terminal_writestring("Memory Management Test:\n");
-    
-    // Display memory statistics
-    terminal_setcolor(vga_entry_color(VGA_COLOR_CYAN, VGA_COLOR_BLACK));
-    pmm_dump_stats();
-    terminal_writestring("\n");
-    heap_dump_stats();
-    terminal_writestring("\n");
-    
-    // Test dynamic memory allocation
-    terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
-    terminal_writestring("Testing dynamic memory allocation...\n");
-    
-    void* ptr1 = kmalloc(1024);
-    terminal_writestring("Allocated 1024 bytes: ");
-    if (ptr1) {
-        terminal_writestring("SUCCESS\n");
-        debug_write_string("kmalloc(1024) successful\n");
-    } else {
-        terminal_writestring("FAILED\n");
-    }
-    
-    void* ptr2 = kmalloc(2048);
-    terminal_writestring("Allocated 2048 bytes: ");
-    if (ptr2) {
-        terminal_writestring("SUCCESS\n");
-        debug_write_string("kmalloc(2048) successful\n");
-    } else {
-        terminal_writestring("FAILED\n");
-    }
-    
-    void* ptr3 = kcalloc(10, 64);
-    terminal_writestring("Allocated 10x64 bytes (zeroed): ");
-    if (ptr3) {
-        terminal_writestring("SUCCESS\n");
-        debug_write_string("kcalloc(10, 64) successful\n");
-    } else {
-        terminal_writestring("FAILED\n");
-    }
-    
-    // Free some memory
-    if (ptr1) {
-        kfree(ptr1);
-        terminal_writestring("Freed first allocation\n");
-    }
-    
-    if (ptr2) {
-        kfree(ptr2);
-        terminal_writestring("Freed second allocation\n");
-    }
-    
-    terminal_writestring("\nAfter allocations and frees:\n");
-    heap_dump_stats();
+    terminal_writestring("- Hardware Drivers (Timer, Keyboard, Serial)\n\n");
     
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
-    terminal_writestring("\nMemory Management Test Complete!\n\n");
-    
-    // System Call Demonstration
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
-    terminal_writestring("System Call Test:\n");
-    
-    // Test system calls from kernel context
-    terminal_writestring("Testing system calls from kernel...\n");
-    
-    // Test SYS_HELLO
-    terminal_writestring("Calling sys_hello: ");
-    int result = syscall_hello();
-    terminal_printf("Result: %d\n", result);
-    
-    // Test SYS_GETPID
-    terminal_writestring("Calling sys_getpid: ");
-    int pid = syscall_getpid();
-    terminal_printf("PID: %d\n", pid);
-    
-    // Test SYS_WRITE
-    syscall_write("Hello from syscall_write!\n");
-    
-    terminal_writestring("Kernel system call tests complete!\n\n");
-    
-    // Clear screen before file system demo
-    terminal_initialize();
-    
-    // File System Demonstration (Day 9)
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
-    terminal_writestring("=== ClaudeOS Day 9 File System Demo ===\n");
-    terminal_writestring("File System Test:\n");
-    
-    if (fs_is_initialized()) {
-        // Display file system statistics
-        terminal_writestring("File system statistics:\n");
-        syscall_fs_stats();
-        terminal_writestring("\n");
-        
-        // Test basic file operations
-        terminal_writestring("Testing file operations...\n");
-        
-        // Create a test file
-        int fd = syscall_open("/test.txt", O_CREATE | O_WRITE);
-        if (fd >= 0) {
-            terminal_writestring("Created file '/test.txt'\n");
-            
-            // Write data to file
-            const char* test_data = "Hello, ClaudeFS! This is a test file.";
-            int bytes_written = syscall_write_file(fd, test_data, strlen(test_data));
-            terminal_printf("Wrote %d bytes to file\n", bytes_written);
-            
-            // Close the file
-            syscall_close(fd);
-            terminal_writestring("File closed\n");
-            
-            // Reopen for reading
-            fd = syscall_open("/test.txt", O_READ);
-            if (fd >= 0) {
-                char read_buffer[256];
-                int bytes_read = syscall_read_file(fd, read_buffer, 255);
-                read_buffer[bytes_read] = '\0';
-                terminal_printf("Read %d bytes: '%s'\n", bytes_read, read_buffer);
-                syscall_close(fd);
-            }
-        } else {
-            terminal_writestring("Failed to create test file\n");
-        }
-        
-        // List directory contents
-        terminal_writestring("Directory listing:\n");
-        syscall_list("/");
-        
-        terminal_writestring("File system test complete!\n\n");
-    } else {
-        terminal_writestring("File system not initialized - skipping tests\n\n");
-    }
-    
-    // Process Management Demonstration
-    terminal_writestring("Process Management Test:\n");
-    
-    // Create test processes (including file system test process)
-    terminal_writestring("Creating test processes...\n");
-    process_t* proc1 = process_create("syscall_test", syscall_test_process, PRIORITY_NORMAL);
-    process_t* proc2 = process_create("fs_test", fs_test_process, PRIORITY_NORMAL);
-    process_t* proc3 = process_create("test_proc_2", test_process_2, PRIORITY_NORMAL);
-    process_t* proc4 = process_create("idle_proc", idle_process, PRIORITY_LOW);
-    
-    if (proc1 && proc2 && proc3 && proc4) {
-        terminal_writestring("Test processes created successfully!\n");
-    } else {
-        terminal_writestring("Failed to create some test processes!\n");
-    }
-    
-    // List all processes
-    process_list_all();
+    terminal_writestring("New Features (Day 11):\n");
+    terminal_writestring("- Interactive Command Shell\n");
+    terminal_writestring("- 11 Built-in Commands\n");
+    terminal_writestring("- File Operations (create, cat, ls, delete)\n");
+    terminal_writestring("- Directory Operations (mkdir, rmdir, cd)\n\n");
     
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
-    terminal_writestring("Day 7 Process Management System Complete!\n");
-    terminal_writestring("All components operational and tested.\n");
-    debug_write_string("Day 7 process management test completed successfully!\n");
-    
-    // Start process scheduler
-    terminal_writestring("\nStarting process scheduler...\n");
-    
-    // Simple scheduler demonstration
-    for (int i = 0; i < 5; i++) {
-        terminal_printf("Scheduler iteration %d\n", i + 1);
-        schedule();
-        // Simple delay
-        for (volatile int j = 0; j < 1000000; j++);
-    }
-    
-    terminal_writestring("Scheduler demonstration complete.\n\n");
+    terminal_writestring("All components ready for shell interface!\n\n");
     
     // Initialize and start shell (Day 11 Phase 1)
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));

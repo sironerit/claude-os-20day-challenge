@@ -6,13 +6,7 @@
 #include "timer.h"
 #include "keyboard.h"
 
-// VGA Color Codes (for exception display)
-typedef enum {
-    VGA_COLOR_BLACK = 0,
-    VGA_COLOR_WHITE = 15,
-    VGA_COLOR_RED = 4,
-} vga_color;
-
+// VGA helper function
 static inline uint8_t vga_entry_color(vga_color fg, vga_color bg) {
     return fg | bg << 4;
 }
