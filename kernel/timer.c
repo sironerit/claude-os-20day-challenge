@@ -8,6 +8,9 @@
 // Global timer tick counter
 static volatile uint32_t timer_ticks = 0;
 
+// Forward declaration for uptime update
+extern void update_uptime(void);
+
 // Initialize the timer
 void timer_init(void) {
     // Calculate divisor for desired frequency
@@ -28,6 +31,11 @@ void timer_init(void) {
 void timer_handler(void) {
     // Increment tick counter
     timer_ticks++;
+    
+    // Update uptime every second (100 ticks = 1 second at 100Hz)
+    if (timer_ticks % 100 == 0) {
+        update_uptime();
+    }
     
     // Send EOI to PIC
     pic_send_eoi(IRQ0_TIMER);

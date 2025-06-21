@@ -26,6 +26,7 @@ static const char scancode_to_ascii_shift[] = {
 // Keyboard state
 static int shift_pressed = 0;
 static int caps_lock = 0;
+static int ctrl_pressed = 0;
 
 // Simple circular buffer for keyboard input
 #define KEYBOARD_BUFFER_SIZE 256
@@ -42,6 +43,7 @@ void keyboard_init(void) {
     // Reset keyboard state
     shift_pressed = 0;
     caps_lock = 0;
+    ctrl_pressed = 0;
     
     // Enable keyboard IRQ (IRQ1)
     pic_clear_mask(IRQ1_KEYBOARD);
@@ -59,6 +61,8 @@ void keyboard_handler(void) {
         // Handle modifier key releases
         if (scancode == SCANCODE_LSHIFT || scancode == SCANCODE_RSHIFT) {
             shift_pressed = 0;
+        } else if (scancode == SCANCODE_CTRL) {
+            ctrl_pressed = 0;
         }
         
         // Send EOI and return (we don't process key releases further)
@@ -73,6 +77,12 @@ void keyboard_handler(void) {
         return;
     }
     
+    if (scancode == SCANCODE_CTRL) {
+        ctrl_pressed = 1;
+        pic_send_eoi(IRQ1_KEYBOARD);
+        return;
+    }
+    
     if (scancode == SCANCODE_CAPS) {
         caps_lock = !caps_lock;  // Toggle caps lock
         pic_send_eoi(IRQ1_KEYBOARD);
@@ -81,15 +91,33 @@ void keyboard_handler(void) {
     
     // Convert scancode to ASCII
     char ascii = 0;
-    if (scancode < sizeof(scancode_to_ascii)) {
-        if (shift_pressed) {
-            ascii = scancode_to_ascii_shift[scancode];
-        } else {
-            ascii = scancode_to_ascii[scancode];
-            
-            // Apply caps lock to letters
-            if (caps_lock && ascii >= 'a' && ascii <= 'z') {
-                ascii = ascii - 'a' + 'A';
+    
+    // Handle Ctrl key combinations
+    if (ctrl_pressed) {
+        // Handle Ctrl+P (scancode 0x19 for P)
+        if (scancode == 0x19) {  // P key
+            ascii = 0x10;  // Ctrl+P
+        }
+        // Handle Ctrl+N (scancode 0x31 for N)  
+        else if (scancode == 0x31) {  // N key
+            ascii = 0x0E;  // Ctrl+N
+        }
+        // Other Ctrl combinations can be added here
+        else {
+            ascii = 0;  // Ignore other Ctrl combinations
+        }
+    } else {
+        // Normal ASCII conversion
+        if (scancode < sizeof(scancode_to_ascii)) {
+            if (shift_pressed) {
+                ascii = scancode_to_ascii_shift[scancode];
+            } else {
+                ascii = scancode_to_ascii[scancode];
+                
+                // Apply caps lock to letters
+                if (caps_lock && ascii >= 'a' && ascii <= 'z') {
+                    ascii = ascii - 'a' + 'A';
+                }
             }
         }
     }
