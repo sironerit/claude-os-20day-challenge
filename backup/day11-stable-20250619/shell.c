@@ -298,11 +298,17 @@ void cmd_ls(const char* path) {
     terminal_writestring("File listing:\n");
     terminal_setcolor(VGA_COLOR_WHITE);
     
-    // Use direct MemFS function call (no syscall dependency)
-    memfs_list_files();
-    terminal_setcolor(VGA_COLOR_LIGHT_GREEN);
-    terminal_writestring("\nFile listing complete.\n");
-    terminal_setcolor(VGA_COLOR_WHITE);
+    // Use sys_list system call to display files
+    int result = syscall_list();
+    if (result == 0) {
+        terminal_setcolor(VGA_COLOR_LIGHT_GREEN);
+        terminal_writestring("\nFile listing complete.\n");
+        terminal_setcolor(VGA_COLOR_WHITE);
+    } else {
+        terminal_setcolor(VGA_COLOR_LIGHT_RED);
+        terminal_writestring("Error listing files.\n");
+        terminal_setcolor(VGA_COLOR_WHITE);
+    }
 }
 
 // Display file contents using MemFS
@@ -315,17 +321,37 @@ void cmd_cat(const char* filename) {
     terminal_writestring("----------------------------------------\n");
     terminal_setcolor(VGA_COLOR_WHITE);
     
-    // Simplified file reading (no syscall dependency)
-    if (memfs_exists(filename)) {
-        terminal_writestring("File exists but content reading requires syscalls.\n");
-        terminal_writestring("(Simplified mode - syscalls disabled)\n");
-    } else {
+    // Open file for reading
+    int fd = syscall_open(filename, 1); // Read mode
+    if (fd < 0) {
         terminal_setcolor(VGA_COLOR_LIGHT_RED);
-        terminal_writestring("Error: File not found '");
+        terminal_writestring("Error: Cannot open file '");
         terminal_writestring(filename);
         terminal_writestring("'\n");
         terminal_setcolor(VGA_COLOR_WHITE);
+        return;
     }
+    
+    // Read file contents
+    char buffer[512];
+    int bytes_read = syscall_read(fd, buffer, 500);
+    
+    if (bytes_read > 0) {
+        buffer[bytes_read] = '\0';
+        terminal_writestring(buffer);
+        terminal_writestring("\n");
+    } else if (bytes_read == 0) {
+        terminal_setcolor(VGA_COLOR_YELLOW);
+        terminal_writestring("(Empty file)\n");
+        terminal_setcolor(VGA_COLOR_WHITE);
+    } else {
+        terminal_setcolor(VGA_COLOR_LIGHT_RED);
+        terminal_writestring("Error reading file\n");
+        terminal_setcolor(VGA_COLOR_WHITE);
+    }
+    
+    // Close file
+    syscall_close(fd);
     
     terminal_setcolor(VGA_COLOR_LIGHT_GREY);
     terminal_writestring("----------------------------------------\n");
@@ -343,8 +369,13 @@ void cmd_create(const char* filename) {
     // Create file using MemFS
     int result = memfs_create(filename);
     if (result == MEMFS_SUCCESS) {
-        // Simplified file creation (no syscall dependency)
-        terminal_writestring("File created successfully (simplified mode).\n");
+        // Open file for writing and add some content
+        int fd = syscall_open(filename, 2); // Write mode
+        if (fd >= 0) {
+            const char* content = "File created by ClaudeOS Shell\nDay 11 - Real file operations!\n";
+            syscall_write_file(fd, content, strlen(content));
+            syscall_close(fd);
+        }
         
         terminal_setcolor(VGA_COLOR_LIGHT_GREEN);
         terminal_writestring("File '");
@@ -417,11 +448,37 @@ void cmd_write(const char* filename) {
         }
     }
     
-    // Simplified file writing (no syscall dependency)
-    terminal_setcolor(VGA_COLOR_LIGHT_GREEN);
-    terminal_writestring("File write operation completed (simplified mode).\n");
-    terminal_writestring("Content would be written in full system mode.\n");
-    terminal_setcolor(VGA_COLOR_WHITE);
+    // Open file for writing
+    int fd = syscall_open(filename, 2); // Write mode
+    if (fd < 0) {
+        terminal_setcolor(VGA_COLOR_LIGHT_RED);
+        terminal_writestring("Failed to open file for writing\n");
+        terminal_setcolor(VGA_COLOR_WHITE);
+        return;
+    }
+    
+    // Write content to file
+    const char* content = "This content was written by the shell write command.\n"
+                         "ClaudeOS Day 11 - Real file operations working!\n"
+                         "Timestamp: System uptime when written.\n";
+    
+    int bytes_written = syscall_write_file(fd, content, strlen(content));
+    syscall_close(fd);
+    
+    if (bytes_written > 0) {
+        terminal_setcolor(VGA_COLOR_LIGHT_GREEN);
+        terminal_writestring("Successfully wrote ");
+        // Convert bytes_written to string for display
+        char bytes_str[16];
+        itoa(bytes_written, bytes_str, 10);
+        terminal_writestring(bytes_str);
+        terminal_writestring(" bytes to file\n");
+        terminal_setcolor(VGA_COLOR_WHITE);
+    } else {
+        terminal_setcolor(VGA_COLOR_LIGHT_RED);
+        terminal_writestring("Failed to write to file\n");
+        terminal_setcolor(VGA_COLOR_WHITE);
+    }
 }
 
 // Display memory information
@@ -430,11 +487,16 @@ void cmd_meminfo(void) {
     terminal_writestring("Memory Information:\n");
     terminal_setcolor(VGA_COLOR_WHITE);
     
-    // Display simplified memory information
-    terminal_writestring("Physical Memory Manager: Active\n");
-    terminal_writestring("Virtual Memory Manager: Disabled (simplified mode)\n");
-    terminal_writestring("Kernel Heap: Disabled (simplified mode)\n");
-    terminal_writestring("Memory File System: Active\n");
+    // Display PMM statistics
+    pmm_dump_stats();
+    terminal_writestring("\n");
+    
+    // Display heap statistics
+    heap_dump_stats();
+    terminal_writestring("\n");
+    
+    // Display MemFS statistics
+    memfs_dump_stats();
 }
 
 // Display system call information
@@ -443,12 +505,19 @@ void cmd_syscalls(void) {
     terminal_writestring("System Call Information:\n");
     terminal_setcolor(VGA_COLOR_WHITE);
     
-    terminal_writestring("System calls are disabled in simplified mode.\n");
-    terminal_writestring("Direct function calls are used instead.\n");
-    terminal_writestring("This ensures stability without complex memory management.\n");
+    terminal_writestring("Available system calls (INT 0x80):\n");
+    terminal_writestring("  0: sys_hello   - Test system call\n");
+    terminal_writestring("  1: sys_write   - Write string to terminal\n");
+    terminal_writestring("  2: sys_getpid  - Get process ID\n");
+    terminal_writestring("  3: sys_yield   - Yield CPU to scheduler\n");
+    terminal_writestring("  4: sys_open    - Open file\n");
+    terminal_writestring("  5: sys_close   - Close file\n");
+    terminal_writestring("  6: sys_read    - Read from file\n");
+    terminal_writestring("  7: sys_write_file - Write to file\n");
+    terminal_writestring("  8: sys_list    - List files\n");
     
-    terminal_setcolor(VGA_COLOR_YELLOW);
-    terminal_writestring("\nNote: Full system call support requires VMM and paging.\n");
+    terminal_setcolor(VGA_COLOR_LIGHT_GREEN);
+    terminal_writestring("\nTotal: 9 system calls available\n");
     terminal_setcolor(VGA_COLOR_WHITE);
 }
 

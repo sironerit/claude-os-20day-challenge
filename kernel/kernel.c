@@ -1,5 +1,5 @@
-// ClaudeOS Kernel - Day 6 Implementation
-// Memory management system integration
+// ClaudeOS Demo Kernel - Stable Day 6 Base + Basic Shell
+// Simplified version for demonstration without complex memory management
 
 #include "kernel.h"
 #include "gdt.h"
@@ -9,22 +9,15 @@
 #include "keyboard.h"
 #include "serial.h"
 #include "pmm.h"
-#include "vmm.h"
-#include "heap.h"
-#include "process.h"
-#include "syscall.h"
-#include "../fs/memfs.h"
+#include "syscall_simple.h"
+#include "../fs/memfs_simple.h"
 
 // VGA Text Mode Constants
 #define VGA_WIDTH 80
 #define VGA_HEIGHT 25
 #define VGA_MEMORY 0xB8000
 
-// Kernel demonstration constants
-#define KERNEL_COUNTER_INTERVAL 1000000
-#define TEST_PROCESS_WORK_LOOP 100000
-
-// Variable argument list support for printf
+// Variable argument list support
 typedef __builtin_va_list va_list;
 #define va_start(v,l) __builtin_va_start(v,l)
 #define va_end(v) __builtin_va_end(v)
@@ -36,20 +29,36 @@ static size_t terminal_column;
 static uint8_t terminal_color;
 static uint16_t* terminal_buffer;
 
-// Utility functions
+// VGA cursor management
+void update_cursor(size_t x, size_t y) {
+    uint16_t pos = y * VGA_WIDTH + x;
+    
+    // Tell the VGA board we are setting the high cursor byte
+    outb(0x3D4, 0x0F);
+    outb(0x3D5, (uint8_t)(pos & 0xFF));
+    
+    // Tell the VGA board we are setting the low cursor byte
+    outb(0x3D4, 0x0E);
+    outb(0x3D5, (uint8_t)((pos >> 8) & 0xFF));
+}
+
+// Advanced shell state
+static char shell_buffer[256];
+static int shell_pos = 0;
+
+// Command parsing
+#define MAX_ARGS 8
+#define MAX_ARG_LEN 64
+static char cmd_args[MAX_ARGS][MAX_ARG_LEN];
+static int cmd_argc;
+
+// VGA utility functions
 static inline uint8_t vga_entry_color(vga_color fg, vga_color bg) {
     return fg | bg << 4;
 }
 
 static inline uint16_t vga_entry(unsigned char uc, uint8_t color) {
     return (uint16_t) uc | (uint16_t) color << 8;
-}
-
-size_t strlen(const char* str) {
-    size_t len = 0;
-    while (str[len])
-        len++;
-    return len;
 }
 
 // Terminal functions
@@ -66,6 +75,9 @@ void terminal_initialize(void) {
             terminal_buffer[index] = vga_entry(' ', terminal_color);
         }
     }
+    
+    // Update hardware cursor
+    update_cursor(terminal_column, terminal_row);
 }
 
 void terminal_setcolor(uint8_t color) {
@@ -77,7 +89,6 @@ void terminal_putentryat(char c, uint8_t color, size_t x, size_t y) {
     terminal_buffer[index] = vga_entry(c, color);
 }
 
-// Scroll screen up by one line
 void terminal_scroll(void) {
     // Move all lines up by one
     for (size_t y = 0; y < VGA_HEIGHT - 1; y++) {
@@ -95,7 +106,48 @@ void terminal_scroll(void) {
     }
 }
 
-// Clear screen
+void terminal_putchar(char c) {
+    if (c == '\n') {
+        terminal_column = 0;
+        if (++terminal_row == VGA_HEIGHT) {
+            terminal_scroll();
+            terminal_row = VGA_HEIGHT - 1;
+        }
+        update_cursor(terminal_column, terminal_row);
+        return;
+    }
+    
+    if (c == '\b') {
+        if (terminal_column > 0) {
+            terminal_column--;
+            terminal_putentryat(' ', terminal_color, terminal_column, terminal_row);
+        }
+        update_cursor(terminal_column, terminal_row);
+        return;
+    }
+    
+    terminal_putentryat(c, terminal_color, terminal_column, terminal_row);
+    if (++terminal_column == VGA_WIDTH) {
+        terminal_column = 0;
+        if (++terminal_row == VGA_HEIGHT) {
+            terminal_scroll();
+            terminal_row = VGA_HEIGHT - 1;
+        }
+    }
+    update_cursor(terminal_column, terminal_row);
+}
+
+void terminal_write(const char* data, size_t size) {
+    for (size_t i = 0; i < size; i++)
+        terminal_putchar(data[i]);
+}
+
+void terminal_writestring(const char* data) {
+    size_t len = 0;
+    while (data[len]) len++; // Simple strlen
+    terminal_write(data, len);
+}
+
 void terminal_clear(void) {
     for (size_t y = 0; y < VGA_HEIGHT; y++) {
         for (size_t x = 0; x < VGA_WIDTH; x++) {
@@ -105,108 +157,273 @@ void terminal_clear(void) {
     }
     terminal_column = 0;
     terminal_row = 0;
+    update_cursor(terminal_column, terminal_row);
 }
 
-void terminal_putchar(char c) {
-    if (c == '\n') {
-        terminal_column = 0;
-        if (++terminal_row == VGA_HEIGHT) {
-            terminal_scroll();
-            terminal_row = VGA_HEIGHT - 1;  // Stay at bottom line
-        }
-        return;
+// Simple shell functions
+void shell_print_prompt(void) {
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+    terminal_writestring("claudeos> ");
+    terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+}
+
+// Parse command line into arguments
+void parse_command_line(const char* cmdline) {
+    cmd_argc = 0;
+    int i = 0;
+    int arg_pos = 0;
+    bool in_arg = false;
+    
+    // Clear previous arguments
+    for (int j = 0; j < MAX_ARGS; j++) {
+        cmd_args[j][0] = '\0';
     }
     
-    if (c == '\b') {
-        // Handle backspace - move cursor back if possible
-        if (terminal_column > 0) {
-            terminal_column--;
-            // Clear the character at the current position
-            terminal_putentryat(' ', terminal_color, terminal_column, terminal_row);
-        }
-        return;
-    }
-    
-    terminal_putentryat(c, terminal_color, terminal_column, terminal_row);
-    if (++terminal_column == VGA_WIDTH) {
-        terminal_column = 0;
-        if (++terminal_row == VGA_HEIGHT) {
-            terminal_scroll();
-            terminal_row = VGA_HEIGHT - 1;  // Stay at bottom line
-        }
-    }
-}
-
-void terminal_write(const char* data, size_t size) {
-    for (size_t i = 0; i < size; i++)
-        terminal_putchar(data[i]);
-}
-
-void terminal_writestring(const char* data) {
-    terminal_write(data, strlen(data));
-}
-
-// Simple printf implementation for debugging
-void terminal_printf(const char* format, ...) {
-    va_list args;
-    va_start(args, format);
-    
-    char buffer[256];
-    int pos = 0;
-    
-    for (int i = 0; format[i] != '\0' && pos < 255; i++) {
-        if (format[i] == '%' && format[i+1] == 'd') {
-            int value = va_arg(args, int);
-            // Simple integer to string conversion
-            if (value == 0) {
-                buffer[pos++] = '0';
-            } else {
-                char temp[12];
-                int temp_pos = 0;
-                int temp_value = value;
-                
-                if (value < 0) {
-                    buffer[pos++] = '-';
-                    temp_value = -value;
-                }
-                
-                while (temp_value > 0) {
-                    temp[temp_pos++] = '0' + (temp_value % 10);
-                    temp_value /= 10;
-                }
-                
-                for (int j = temp_pos - 1; j >= 0; j--) {
-                    buffer[pos++] = temp[j];
-                }
+    while (cmdline[i] && cmd_argc < MAX_ARGS) {
+        if (cmdline[i] == ' ' || cmdline[i] == '\t') {
+            if (in_arg) {
+                cmd_args[cmd_argc][arg_pos] = '\0';
+                cmd_argc++;
+                arg_pos = 0;
+                in_arg = false;
             }
-            i++; // Skip the 'd'
-        } else if (format[i] == '%' && format[i+1] == 's') {
-            char* str = va_arg(args, char*);
-            while (*str && pos < 255) {
-                buffer[pos++] = *str++;
-            }
-            i++; // Skip the 's'
         } else {
-            buffer[pos++] = format[i];
+            if (!in_arg) {
+                in_arg = true;
+            }
+            if (arg_pos < MAX_ARG_LEN - 1) {
+                cmd_args[cmd_argc][arg_pos] = cmdline[i];
+                arg_pos++;
+            }
         }
+        i++;
     }
     
-    buffer[pos] = '\0';
-    terminal_writestring(buffer);
-    
-    va_end(args);
+    // Add final argument if exists
+    if (in_arg && cmd_argc < MAX_ARGS) {
+        cmd_args[cmd_argc][arg_pos] = '\0';
+        cmd_argc++;
+    }
 }
 
-// Kernel panic function
-void kernel_panic(const char* message) {
-    terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_RED));
-    terminal_writestring("\n*** KERNEL PANIC ***\n");
-    terminal_writestring(message);
-    terminal_writestring("\nSystem halted.");
+// String comparison helper
+static int shell_strcmp(const char* str1, const char* str2) {
+    while (*str1 && *str2 && *str1 == *str2) {
+        str1++;
+        str2++;
+    }
+    return *str1 - *str2;
+}
+
+void shell_process_command(const char* cmd) {
+    // Parse command line into arguments
+    parse_command_line(cmd);
     
-    // Halt the CPU
-    while (1) {
-        asm volatile ("hlt");
+    if (cmd_argc == 0) return;
+    
+    if (shell_strcmp(cmd_args[0], "help") == 0) {
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+        terminal_writestring("ClaudeOS Demo Shell - Available Commands:\n");
+        terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+        terminal_writestring("  help     - Show this help\n");
+        terminal_writestring("  clear    - Clear screen\n");
+        terminal_writestring("  version  - Show version\n");
+        terminal_writestring("  hello    - Say hello\n");
+        terminal_writestring("  demo     - Demo message\n");
+        terminal_writestring("  meminfo  - Show memory statistics\n");
+        terminal_writestring("  syscalls - Test system calls\n");
+        terminal_writestring("  ls       - List files\n");
+        terminal_writestring("  cat <file> - Display file content\n");
+        terminal_writestring("  create <file> - Create new file\n");
+        terminal_writestring("  delete <file> - Delete file\n");
+        terminal_writestring("  write <file> <text> - Write to file\n");
+        terminal_writestring("  fsinfo   - File system statistics\n\n");
+    } else if (shell_strcmp(cmd_args[0], "clear") == 0) {
+        terminal_clear();
+        // Don't print prompt here - let the main loop handle it
+        return;
+    } else if (shell_strcmp(cmd_args[0], "version") == 0) {
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+        terminal_writestring("ClaudeOS Day 10 - Advanced Shell v1.0\n");
+        terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+        terminal_writestring("Enhanced with argument parsing and file operations\n");
+    } else if (shell_strcmp(cmd_args[0], "hello") == 0) {
+        terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
+        terminal_writestring("Hello from ClaudeOS Shell!\n");
+        terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+    } else if (shell_strcmp(cmd_args[0], "demo") == 0) {
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK));
+        terminal_writestring("Demo: Advanced shell with argument parsing!\n");
+        terminal_writestring("Day 10 functionality working!\n");
+        terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+    } else if (shell_strcmp(cmd_args[0], "meminfo") == 0) {
+        pmm_dump_stats();
+    } else if (shell_strcmp(cmd_args[0], "syscalls") == 0) {
+        test_syscalls();
+    } else if (shell_strcmp(cmd_args[0], "ls") == 0) {
+        memfs_simple_list_files();
+    } else if (shell_strcmp(cmd_args[0], "cat") == 0) {
+        if (cmd_argc < 2) {
+            terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
+            terminal_writestring("Usage: cat <filename>\n");
+            terminal_writestring("Available files: hello.txt, readme.md, test.txt\n");
+            terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+        } else {
+            terminal_setcolor(vga_entry_color(VGA_COLOR_CYAN, VGA_COLOR_BLACK));
+            terminal_writestring("Displaying ");
+            terminal_writestring(cmd_args[1]);
+            
+            // Debug: show file size
+            int file_size = memfs_simple_get_size(cmd_args[1]);
+            terminal_writestring(" (");
+            char size_str[16];
+            uint32_t size = (file_size > 0) ? (uint32_t)file_size : 0;
+            int pos = 0;
+            if (size == 0) {
+                size_str[pos++] = '0';
+            } else {
+                while (size > 0) {
+                    size_str[pos++] = '0' + (size % 10);
+                    size /= 10;
+                }
+            }
+            for (int i = 0; i < pos / 2; i++) {
+                char temp = size_str[i];
+                size_str[i] = size_str[pos - 1 - i];
+                size_str[pos - 1 - i] = temp;
+            }
+            size_str[pos] = '\0';
+            terminal_writestring(size_str);
+            terminal_writestring(" bytes):\n");
+            terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+            
+            char buffer[256];
+            // Clear buffer first
+            for (int i = 0; i < 256; i++) {
+                buffer[i] = '\0';
+            }
+            
+            int result = memfs_simple_read(cmd_args[1], buffer, 256);
+            if (result > 0) {
+                // Process and display the content
+                for (int i = 0; i < result; i++) {
+                    char c = buffer[i];
+                    if (c == '\0') break;  // Stop at null terminator
+                    if (c == '\n') {
+                        terminal_putchar('\n');
+                    } else if (c >= 32 && c <= 126) {  // Printable ASCII only
+                        terminal_putchar(c);
+                    }
+                }
+                terminal_putchar('\n');
+            } else {
+                terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+                terminal_writestring("File not found or read error\n");
+                terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+            }
+        }
+    } else if (shell_strcmp(cmd_args[0], "create") == 0) {
+        if (cmd_argc < 2) {
+            terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
+            terminal_writestring("Usage: create <filename>\n");
+            terminal_writestring("Example: create myfile.txt\n");
+            terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+        } else {
+            terminal_setcolor(vga_entry_color(VGA_COLOR_CYAN, VGA_COLOR_BLACK));
+            terminal_writestring("Creating file: ");
+            terminal_writestring(cmd_args[1]);
+            terminal_writestring("\n");
+            terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+            
+            int result = memfs_simple_create(cmd_args[1]);
+            if (result == MEMFS_SUCCESS) {
+                memfs_simple_write(cmd_args[1], "This is a newly created file!\nDay 10 Advanced Shell working!");
+                terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+                terminal_writestring("File created successfully!\n");
+                terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+            } else if (result == MEMFS_EXISTS) {
+                terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
+                terminal_writestring("File already exists!\n");
+                terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+            } else {
+                terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+                terminal_writestring("Failed to create file\n");
+                terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+            }
+        }
+    } else if (shell_strcmp(cmd_args[0], "delete") == 0) {
+        if (cmd_argc < 2) {
+            terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
+            terminal_writestring("Usage: delete <filename>\n");
+            terminal_writestring("Example: delete test.txt\n");
+            terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+        } else {
+            terminal_setcolor(vga_entry_color(VGA_COLOR_CYAN, VGA_COLOR_BLACK));
+            terminal_writestring("Deleting file: ");
+            terminal_writestring(cmd_args[1]);
+            terminal_writestring("\n");
+            terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+            
+            int result = memfs_simple_delete(cmd_args[1]);
+            if (result == MEMFS_SUCCESS) {
+                terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+                terminal_writestring("File deleted successfully!\n");
+                terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+            } else if (result == MEMFS_NOT_FOUND) {
+                terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
+                terminal_writestring("File not found!\n");
+                terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+            } else {
+                terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+                terminal_writestring("Failed to delete file\n");
+                terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+            }
+        }
+    } else if (shell_strcmp(cmd_args[0], "write") == 0) {
+        if (cmd_argc < 3) {
+            terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
+            terminal_writestring("Usage: write <filename> <text>\n");
+            terminal_writestring("Example: write myfile.txt Hello World\n");
+            terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+        } else {
+            // Combine all arguments after filename into content
+            char content[256] = {0};
+            int content_pos = 0;
+            for (int i = 2; i < cmd_argc && content_pos < 250; i++) {
+                if (i > 2) {
+                    content[content_pos++] = ' ';
+                }
+                for (int j = 0; cmd_args[i][j] && content_pos < 250; j++) {
+                    content[content_pos++] = cmd_args[i][j];
+                }
+            }
+            content[content_pos] = '\0';
+            
+            terminal_setcolor(vga_entry_color(VGA_COLOR_CYAN, VGA_COLOR_BLACK));
+            terminal_writestring("Writing to file: ");
+            terminal_writestring(cmd_args[1]);
+            terminal_writestring("\n");
+            terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+            
+            int result = memfs_simple_write(cmd_args[1], content);
+            if (result > 0) {
+                terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+                terminal_writestring("Content written successfully!\n");
+                terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+            } else {
+                terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+                terminal_writestring("Failed to write to file\n");
+                terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+            }
+        }
+    } else if (shell_strcmp(cmd_args[0], "fsinfo") == 0) {
+        memfs_simple_dump_stats();
+    } else if (cmd_argc > 0) {
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+        terminal_writestring("Command not found: ");
+        terminal_writestring(cmd_args[0]);
+        terminal_writestring("\n");
+        terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
     }
 }
 
@@ -215,292 +432,87 @@ void kernel_main(void) {
     // Initialize terminal
     terminal_initialize();
     
-    // Display welcome message  
+    // Display welcome message
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
-    terminal_writestring("ClaudeOS - Day 9 Memory File System\n");
-    terminal_writestring("====================================\n");
-    
+    terminal_writestring("ClaudeOS Day 10 - Advanced Shell System\n");
+    terminal_writestring("========================================\n");
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
-    terminal_writestring("Kernel loaded successfully!\n");
-    terminal_writestring("VGA text mode initialized.\n");
+    terminal_writestring("Day 10: PMM + Syscalls + MemFS + Advanced Shell\n\n");
     
-    // Initialize GDT
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK));
-    terminal_writestring("Initializing GDT...\n");
-    gdt_init();
-    terminal_writestring("GDT initialized successfully!\n");
-    
-    // Initialize IDT
-    terminal_writestring("Initializing IDT...\n");
-    idt_init();
-    terminal_writestring("IDT initialized successfully!\n");
-    
-    // Initialize PIC
+    // Initialize basic systems
     terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
-    terminal_writestring("Initializing PIC...\n");
+    terminal_writestring("Initializing systems...\n");
+    
+    gdt_init();
+    terminal_writestring("GDT: OK\n");
+    
+    idt_init();
+    terminal_writestring("IDT: OK\n");
+    
     pic_init();
-    terminal_writestring("PIC initialized successfully!\n");
+    terminal_writestring("PIC: OK\n");
     
-    // Initialize Timer
-    terminal_writestring("Initializing Timer...\n");
     timer_init();
-    terminal_writestring("Timer initialized successfully!\n");
+    terminal_writestring("Timer: OK\n");
     
-    // Initialize Serial Port
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK));
-    terminal_writestring("Initializing Serial Port...\n");
+    keyboard_init();
+    terminal_writestring("Keyboard: OK\n");
+    
     if (serial_init(SERIAL_COM1_BASE) == 0) {
-        terminal_writestring("Serial port initialized successfully!\n");
-        debug_write_string("ClaudeOS Day 6 - Serial debug output active\n");
-    } else {
-        terminal_writestring("Serial port initialization failed!\n");
+        terminal_writestring("Serial: OK\n");
     }
     
-    // Initialize Keyboard
-    terminal_writestring("Initializing Keyboard...\n");
-    keyboard_init();
-    terminal_writestring("Keyboard initialized successfully!\n");
-    
-    // Initialize Physical Memory Manager
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
-    terminal_writestring("Initializing Physical Memory Manager...\n");
     pmm_init();
-    terminal_writestring("PMM initialized successfully!\n");
+    terminal_writestring("PMM: OK\n");
     
-    // Initialize Virtual Memory Manager
-    terminal_writestring("Initializing Virtual Memory Manager...\n");
-    vmm_init();
-    terminal_writestring("VMM initialized successfully!\n");
+    syscall_simple_init();
+    terminal_writestring("Syscalls: OK\n");
     
-    // Enable paging
-    terminal_writestring("Enabling paging...\n");
-    vmm_switch_page_directory(current_page_directory);
-    vmm_enable_paging();
-    terminal_writestring("Paging enabled successfully!\n");
-    
-    // Initialize Kernel Heap
-    terminal_writestring("Initializing Kernel Heap...\n");
-    heap_init();
-    terminal_writestring("Heap initialized successfully!\n");
-    
-    // Initialize Process Management
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK));
-    terminal_writestring("Initializing Process Management...\n");
-    process_init();
-    terminal_writestring("Process management initialized successfully!\n");
-    
-    // Initialize System Calls
-    terminal_writestring("Initializing System Calls...\n");
-    syscall_init();
-    terminal_writestring("System calls initialized successfully!\n");
-    
-    // Initialize Memory File System
-    terminal_writestring("Initializing Memory File System...\n");
-    memfs_init();
-    terminal_writestring("Memory file system initialized successfully!\n");
+    memfs_simple_init();
+    terminal_writestring("MemFS: OK\n");
     
     // Enable interrupts
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
     terminal_writestring("Enabling interrupts...\n");
     asm volatile ("sti");
-    terminal_writestring("Interrupts enabled!\n\n");
+    terminal_writestring("All systems ready!\n\n");
     
+    // Start shell
     terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
-    terminal_writestring("Day 9 Features:\n");
-    terminal_writestring("- Physical Memory Manager (PMM)\n");
-    terminal_writestring("- Virtual Memory Manager (VMM)\n");
-    terminal_writestring("- Paging System (4KB pages)\n");
-    terminal_writestring("- Kernel Heap (kmalloc/kfree)\n");
-    terminal_writestring("- Minimal Process Management\n");
-    terminal_writestring("- Basic Round-Robin Scheduler\n");
-    terminal_writestring("- Simple Context Switching\n");
-    terminal_writestring("- System Call Interface (INT 0x80)\n");
-    terminal_writestring("- 9 System Calls (incl. file operations)\n");
-    terminal_writestring("- Memory-Based File System (MemFS)\n");
-    terminal_writestring("- File Operations (open/read/write/close/list)\n\n");
+    terminal_writestring("Type 'help' for available commands.\n\n");
+    shell_print_prompt();
     
-    // Memory management demonstration
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BROWN, VGA_COLOR_BLACK));
-    terminal_writestring("Memory Management Test:\n");
-    
-    // Display memory statistics
-    terminal_setcolor(vga_entry_color(VGA_COLOR_CYAN, VGA_COLOR_BLACK));
-    pmm_dump_stats();
-    terminal_writestring("\n");
-    heap_dump_stats();
-    terminal_writestring("\n");
-    
-    // Test dynamic memory allocation
-    terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
-    terminal_writestring("Testing dynamic memory allocation...\n");
-    
-    void* ptr1 = kmalloc(1024);
-    terminal_writestring("Allocated 1024 bytes: ");
-    if (ptr1) {
-        terminal_writestring("SUCCESS\n");
-        debug_write_string("kmalloc(1024) successful\n");
-    } else {
-        terminal_writestring("FAILED\n");
-    }
-    
-    void* ptr2 = kmalloc(2048);
-    terminal_writestring("Allocated 2048 bytes: ");
-    if (ptr2) {
-        terminal_writestring("SUCCESS\n");
-        debug_write_string("kmalloc(2048) successful\n");
-    } else {
-        terminal_writestring("FAILED\n");
-    }
-    
-    void* ptr3 = kcalloc(10, 64);
-    terminal_writestring("Allocated 10x64 bytes (zeroed): ");
-    if (ptr3) {
-        terminal_writestring("SUCCESS\n");
-        debug_write_string("kcalloc(10, 64) successful\n");
-    } else {
-        terminal_writestring("FAILED\n");
-    }
-    
-    // Free some memory
-    if (ptr1) {
-        kfree(ptr1);
-        terminal_writestring("Freed first allocation\n");
-    }
-    
-    if (ptr2) {
-        kfree(ptr2);
-        terminal_writestring("Freed second allocation\n");
-    }
-    
-    terminal_writestring("\nAfter allocations and frees:\n");
-    heap_dump_stats();
-    
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
-    terminal_writestring("\nDay 6 Memory Management System Complete!\n");
-    terminal_writestring("All components operational and tested.\n");
-    debug_write_string("Day 6 memory management test completed successfully!\n");
-    
-    // Process management test
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
-    terminal_writestring("Process Management Test:\n");
-    
-    // Create test processes  
-    int pid1 = process_create(test_process_1, "test1");
-    int pid2 = process_create(test_process_2, "test2");
-    
-    if (pid1 != INVALID_PID) {
-        terminal_printf("Created test process 1 (PID: %d)\n", pid1);
-    }
-    if (pid2 != INVALID_PID) {
-        terminal_printf("Created test process 2 (PID: %d)\n", pid2);
-    }
-    
-    // List all processes
-    process_list();
-    
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
-    terminal_writestring("Day 7 Minimal Process Management Complete!\n");
-    terminal_writestring("Basic scheduling demonstration ready.\n");
-    
-    // System call testing
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
-    terminal_writestring("\nSystem Call Testing:\n");
-    
-    // Test sys_hello system call
-    terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
-    terminal_writestring("Testing sys_hello system call...\n");
-    int result = syscall_hello();
-    terminal_printf("sys_hello returned: %d\n", result);
-    
-    // Test sys_write system call
-    terminal_writestring("Testing sys_write system call...\n");
-    result = syscall_write("Hello from system call!\n");
-    terminal_printf("sys_write returned: %d\n", result);
-    
-    // Test sys_getpid system call
-    terminal_writestring("Testing sys_getpid system call...\n");
-    result = syscall_getpid();
-    terminal_printf("sys_getpid returned: %d\n", result);
-    
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
-    terminal_writestring("Day 8 Basic System Calls Complete!\n");
-    terminal_writestring("All 4 system calls operational and tested.\n");
-    
-    // File system testing
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
-    terminal_writestring("\nFile System Testing:\n");
-    
-    // Test file listing
-    terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
-    terminal_writestring("Testing sys_list system call...\n");
-    result = syscall_list();
-    terminal_printf("sys_list returned: %d\n", result);
-    
-    // Test file opening and reading
-    terminal_writestring("Testing sys_open system call...\n");
-    int fd = syscall_open("hello.txt", 1); // Read mode
-    terminal_printf("sys_open returned fd: %d\n", fd);
-    
-    if (fd >= 0) {
-        terminal_writestring("Testing sys_read system call...\n");
-        char buffer[128];
-        int bytes_read = syscall_read(fd, buffer, 50);
-        terminal_printf("sys_read returned: %d bytes\n", bytes_read);
-        
-        if (bytes_read > 0) {
-            buffer[bytes_read] = '\0';
-            terminal_setcolor(vga_entry_color(VGA_COLOR_CYAN, VGA_COLOR_BLACK));
-            terminal_writestring("File content: ");
-            terminal_writestring(buffer);
-        }
-        
-        terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
-        terminal_writestring("Testing sys_close system call...\n");
-        result = syscall_close(fd);
-        terminal_printf("sys_close returned: %d\n", result);
-    }
-    
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
-    terminal_writestring("Day 9 Memory File System Complete!\n");
-    terminal_writestring("All file operations operational and tested.\n");
-    
-    // Simple demonstration loop (no actual process switching yet)
-    int counter = 0;
+    // Main shell loop
     while (1) {
         asm volatile ("hlt");
         
-        // Simple counter to show kernel is running
-        if (++counter % KERNEL_COUNTER_INTERVAL == 0) {
-            terminal_printf("Kernel running... (%d)\n", counter / KERNEL_COUNTER_INTERVAL);
+        char c = keyboard_get_char();
+        if (c != 0) {
+            if (c == '\n') {
+                terminal_putchar('\n');
+                shell_buffer[shell_pos] = '\0';
+                
+                if (shell_pos > 0) {
+                    shell_process_command(shell_buffer);
+                }
+                
+                shell_pos = 0;
+                shell_buffer[0] = '\0';
+                shell_print_prompt();
+                
+            } else if (c == '\b') {
+                if (shell_pos > 0) {
+                    shell_pos--;
+                    shell_buffer[shell_pos] = '\0';
+                    terminal_putchar('\b');
+                }
+            } else if (c >= 32 && c <= 126) {
+                if (shell_pos < 255) {
+                    shell_buffer[shell_pos] = c;
+                    shell_pos++;
+                    terminal_putchar(c);
+                }
+            }
         }
     }
-}
-
-// Test process functions (simple demonstrations)
-void test_process_1(void) {
-    terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
-    terminal_writestring("[PROC1] Test process 1 running\n");
-    
-    for (int i = 0; i < 3; i++) {
-        terminal_printf("[PROC1] Iteration %d\n", i + 1);
-        // Simple loop simulation
-        for (volatile int j = 0; j < TEST_PROCESS_WORK_LOOP; j++);
-    }
-    
-    terminal_writestring("[PROC1] Test process 1 exiting\n");
-    process_exit();
-}
-
-void test_process_2(void) {
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK));
-    terminal_writestring("[PROC2] Test process 2 running\n");
-    
-    for (int i = 0; i < 3; i++) {
-        terminal_printf("[PROC2] Iteration %d\n", i + 1);
-        // Simple loop simulation
-        for (volatile int j = 0; j < TEST_PROCESS_WORK_LOOP; j++);
-    }
-    
-    terminal_writestring("[PROC2] Test process 2 exiting\n");
-    process_exit();
 }

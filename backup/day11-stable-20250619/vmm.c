@@ -5,10 +5,6 @@
 #include "pmm.h"
 #include "kernel.h"
 
-// Temporary define for kernel virtual base (identity mapping)
-#define KERNEL_VIRTUAL_BASE 0x00000000
-#define PAGE_SIZE 4096
-
 // Current page directory
 page_directory_t* current_page_directory = 0;
 
@@ -34,12 +30,13 @@ static page_table_t* get_page_table(page_directory_t* dir, uint32_t virt_addr, i
         }
         
         // Clear the page table
-        // Use a safer approach: zero the entire 4KB page
-        uint8_t* table_ptr = (uint8_t*)table_phys;
-        for (int i = 0; i < PAGE_SIZE; i++) {
-            table_ptr[i] = 0;
-        }
         page_table_t* table = (page_table_t*)table_phys;
+        for (int i = 0; i < PAGES_PER_TABLE; i++) {
+            table->pages[i].present = 0;
+            table->pages[i].writable = 0;
+            table->pages[i].user = 0;
+            table->pages[i].frame = 0;
+        }
         
         // Set up directory entry
         dir_entry->present = 1;
@@ -63,13 +60,15 @@ void vmm_init(void) {
         kernel_panic("VMM: Failed to allocate page directory");
     }
     
-    // Clear page directory using safe memory access
-    uint8_t* dir_ptr = (uint8_t*)page_dir_phys;
-    for (int i = 0; i < PAGE_SIZE; i++) {
-        dir_ptr[i] = 0;
-    }
-    
     current_page_directory = (page_directory_t*)page_dir_phys;
+    
+    // Clear page directory
+    for (int i = 0; i < PAGES_PER_DIR; i++) {
+        current_page_directory->tables[i].present = 0;
+        current_page_directory->tables[i].writable = 0;
+        current_page_directory->tables[i].user = 0;
+        current_page_directory->tables[i].table = 0;
+    }
     
     // Identity map first 4MB (kernel space)
     vmm_identity_map_kernel(current_page_directory);
@@ -84,13 +83,15 @@ page_directory_t* vmm_create_page_directory(void) {
         return 0;
     }
     
-    // Clear page directory using safe memory access
-    uint8_t* dir_ptr = (uint8_t*)page_dir_phys;
-    for (int i = 0; i < PAGE_SIZE; i++) {
-        dir_ptr[i] = 0;
-    }
-    
     page_directory_t* dir = (page_directory_t*)page_dir_phys;
+    
+    // Clear page directory
+    for (int i = 0; i < PAGES_PER_DIR; i++) {
+        dir->tables[i].present = 0;
+        dir->tables[i].writable = 0;
+        dir->tables[i].user = 0;
+        dir->tables[i].table = 0;
+    }
     
     return dir;
 }

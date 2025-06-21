@@ -14,8 +14,8 @@ ASFLAGS = -f elf32
 # Linker flags
 LDFLAGS = -m elf_i386 -T linker.ld
 
-# Object files (Day 9 - with PMM + Simple Syscalls + MemFS)
-OBJS = build/entry.o build/kernel.o build/gdt.o build/gdt_flush.o build/idt.o build/idt_flush.o build/isr.o build/isr_asm.o build/pic.o build/io.o build/timer.o build/keyboard.o build/serial.o build/pmm.o build/syscall_simple.o build/memfs_simple.o
+# Object files (Day 11 - shell and string added)
+OBJS = build/entry.o build/kernel.o build/gdt.o build/gdt_flush.o build/idt.o build/idt_flush.o build/isr.o build/isr_asm.o build/pic.o build/io.o build/timer.o build/keyboard.o build/serial.o build/pmm.o build/vmm.o build/paging.o build/heap.o build/process.o build/context_switch.o build/syscall.o build/syscall_interrupt_handler.o build/memfs.o build/string.o build/shell.o
 
 # Build directory
 BUILD_DIR = build
@@ -78,14 +78,6 @@ $(BUILD_DIR)/keyboard.o: kernel/keyboard.c | $(BUILD_DIR)
 
 # Compile Serial C code
 $(BUILD_DIR)/serial.o: kernel/serial.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) $< -o $@
-
-# Compile Simple Syscall C code
-$(BUILD_DIR)/syscall_simple.o: kernel/syscall_simple.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) $< -o $@
-
-# Compile Simple MemFS C code
-$(BUILD_DIR)/memfs_simple.o: fs/memfs_simple.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) $< -o $@
 
 # Compile PMM C code
