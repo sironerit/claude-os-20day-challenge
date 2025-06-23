@@ -9,6 +9,7 @@
 #include "keyboard.h"
 #include "serial.h"
 #include "pmm.h"
+#include "vmm.h"
 #include "syscall_simple.h"
 #include "../fs/memfs_simple.h"
 
@@ -773,7 +774,7 @@ const char* tab_complete_command(const char* partial) {
         "help", "clear", "version", "hello", "demo", "meminfo", "sysinfo",
         "ls", "cat", "create", "delete", "write", "mkdir", "rmdir", "cd", "pwd",
         "touch", "cp", "mv", "find", "history", "fsinfo", "uptime", "syscalls",
-        "top", "file", "wc", "grep", "alias", NULL
+        "top", "file", "wc", "grep", "alias", "vmm", NULL
     };
     
     const char* match = NULL;
@@ -973,6 +974,7 @@ void shell_process_command(const char* cmd) {
         terminal_writestring("  wc <file> - Count lines, words, characters\n");
         terminal_writestring("  grep <pattern> <file> - Search in file\n");
         terminal_writestring("  alias    - Show active aliases\n");
+        terminal_writestring("  vmm <cmd> - Virtual memory manager (Day 12)\n");
         terminal_writestring("\n");
         terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
         terminal_writestring("Navigation & Features:\n");
@@ -1406,12 +1408,97 @@ void shell_process_command(const char* cmd) {
         }
     } else if (shell_strcmp(cmd_args[0], "alias") == 0) {
         list_aliases();
+    } else if (shell_strcmp(cmd_args[0], "vmm") == 0) {
+        if (cmd_argc > 1 && shell_strcmp(cmd_args[1], "init") == 0) {
+            terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
+            terminal_writestring("Initializing Virtual Memory Manager (experimental)...\n");
+            terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+            
+            vmm_init();
+            
+            terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+            terminal_writestring("VMM: Initialization complete!\n");
+            terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+        } else if (cmd_argc > 1 && shell_strcmp(cmd_args[1], "info") == 0) {
+            terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+            terminal_writestring("Virtual Memory Manager Status:\n");
+            terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+            if (current_page_directory) {
+                terminal_writestring("  Status: Initialized\n");
+                
+                // Check if paging is enabled by reading CR0
+                uint32_t cr0;
+                asm volatile ("mov %%cr0, %0" : "=r" (cr0));
+                if (cr0 & 0x80000000) {
+                    terminal_writestring("  Paging: Enabled\n");
+                } else {
+                    terminal_writestring("  Paging: Disabled\n");
+                }
+                
+                terminal_writestring("  Page Directory: 0x");
+                // Print page directory address in hex
+                uint32_t addr = (uint32_t)current_page_directory;
+                char addr_str[12] = "00000000";
+                for (int i = 7; i >= 0; i--) {
+                    uint32_t digit = addr & 0xF;
+                    addr_str[i] = (digit < 10) ? ('0' + digit) : ('A' + digit - 10);
+                    addr >>= 4;
+                }
+                addr_str[8] = '\0';
+                terminal_writestring(addr_str);
+                terminal_writestring("\n");
+                
+                terminal_writestring("  Identity Mapping: 0-4MB kernel space\n");
+            } else {
+                terminal_writestring("  Status: Not initialized\n");
+            }
+        } else if (cmd_argc > 1 && shell_strcmp(cmd_args[1], "enable") == 0) {
+            terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
+            terminal_writestring("Enabling paging (experimental - use with caution)...\n");
+            terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+            
+            if (!current_page_directory) {
+                terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+                terminal_writestring("Error: VMM not initialized. Run 'vmm init' first.\n");
+                terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+            } else {
+                // Load page directory and enable paging
+                vmm_load_page_directory((uint32_t)current_page_directory);
+                vmm_enable_paging();
+                
+                terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+                terminal_writestring("Paging enabled successfully!\n");
+                terminal_writestring("Virtual memory is now active.\n");
+                terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+            }
+        } else {
+            terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
+            terminal_writestring("Usage: vmm <command>\n");
+            terminal_writestring("Commands:\n");
+            terminal_writestring("  init   - Initialize virtual memory manager\n");
+            terminal_writestring("  info   - Show VMM status\n");
+            terminal_writestring("  enable - Enable paging (experimental)\n");
+            terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+        }
     } else if (cmd_argc > 0) {
         terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
         terminal_writestring("Command not found: ");
         terminal_writestring(cmd_args[0]);
         terminal_writestring("\n");
         terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+    }
+}
+
+// Kernel panic function
+void kernel_panic(const char* message) {
+    terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_RED));
+    terminal_writestring("\n*** KERNEL PANIC ***\n");
+    terminal_writestring(message);
+    terminal_writestring("\nSystem halted.\n");
+    
+    // Halt the CPU
+    while (1) {
+        asm volatile ("hlt");
     }
 }
 
