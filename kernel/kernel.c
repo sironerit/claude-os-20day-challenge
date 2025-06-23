@@ -1471,12 +1471,106 @@ void shell_process_command(const char* cmd) {
                 terminal_writestring("Virtual memory is now active.\n");
                 terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
             }
+        } else if (cmd_argc > 1 && shell_strcmp(cmd_args[1], "test") == 0) {
+            terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
+            terminal_writestring("Testing virtual memory mapping...\n");
+            terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+            
+            if (!current_page_directory) {
+                terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+                terminal_writestring("Error: VMM not initialized. Run 'vmm init' first.\n");
+                terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+            } else {
+                // Test virtual to physical address translation
+                uint32_t test_addrs[] = {0x00000000, 0x00001000, 0x00100000, 0x001FF000};
+                const char* addr_names[] = {"0x00000000", "0x00001000", "0x00100000", "0x001FF000"};
+                
+                for (int i = 0; i < 4; i++) {
+                    uint32_t virt_addr = test_addrs[i];
+                    uint32_t phys_addr = vmm_get_physical_address(current_page_directory, virt_addr);
+                    
+                    terminal_writestring("  Virtual ");
+                    terminal_writestring(addr_names[i]);
+                    terminal_writestring(" -> Physical 0x");
+                    
+                    // Print physical address in hex
+                    char phys_str[12] = "00000000";
+                    for (int j = 7; j >= 0; j--) {
+                        uint32_t digit = phys_addr & 0xF;
+                        phys_str[j] = (digit < 10) ? ('0' + digit) : ('A' + digit - 10);
+                        phys_addr >>= 4;
+                    }
+                    phys_str[8] = '\0';
+                    terminal_writestring(phys_str);
+                    
+                    // Check if page is present
+                    if (vmm_is_page_present(current_page_directory, virt_addr)) {
+                        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+                        terminal_writestring(" [MAPPED]");
+                        terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+                    } else {
+                        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+                        terminal_writestring(" [NOT MAPPED]");
+                        terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+                    }
+                    terminal_writestring("\n");
+                }
+                
+                terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+                terminal_writestring("Memory mapping test completed.\n");
+                terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+            }
+        } else if (cmd_argc > 1 && shell_strcmp(cmd_args[1], "stats") == 0) {
+            terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+            terminal_writestring("Virtual Memory Statistics:\n");
+            terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+            
+            if (!current_page_directory) {
+                terminal_writestring("  VMM Status: Not initialized\n");
+            } else {
+                terminal_writestring("  VMM Status: Initialized\n");
+                terminal_writestring("  Page Size: 4KB (4096 bytes)\n");
+                terminal_writestring("  Page Tables per Directory: 1024\n");
+                terminal_writestring("  Pages per Table: 1024\n");
+                terminal_writestring("  Total Virtual Address Space: 4GB\n");
+                terminal_writestring("  Currently Mapped: 0-4MB (kernel space)\n");
+                
+                // Count mapped pages
+                int mapped_pages = 0;
+                for (uint32_t addr = 0; addr < 0x400000; addr += 4096) {
+                    if (vmm_is_page_present(current_page_directory, addr)) {
+                        mapped_pages++;
+                    }
+                }
+                
+                terminal_writestring("  Mapped Pages: ");
+                char count_str[16];
+                int pos = 0;
+                if (mapped_pages == 0) {
+                    count_str[pos++] = '0';
+                } else {
+                    while (mapped_pages > 0) {
+                        count_str[pos++] = '0' + (mapped_pages % 10);
+                        mapped_pages /= 10;
+                    }
+                }
+                for (int i = 0; i < pos / 2; i++) {
+                    char temp = count_str[i];
+                    count_str[i] = count_str[pos - 1 - i];
+                    count_str[pos - 1 - i] = temp;
+                }
+                count_str[pos] = '\0';
+                terminal_writestring(count_str);
+                terminal_writestring(" pages\n");
+            }
         } else {
             terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
             terminal_writestring("Usage: vmm <command>\n");
             terminal_writestring("Commands:\n");
             terminal_writestring("  init   - Initialize virtual memory manager\n");
             terminal_writestring("  info   - Show VMM status\n");
+            terminal_writestring("  test   - Test virtual memory mapping\n");
+            terminal_writestring("  stats  - Show virtual memory statistics\n");
             terminal_writestring("  enable - Enable paging (experimental)\n");
             terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
         }
