@@ -41,6 +41,11 @@ void kernel_panic(const char* message);
 // Simple printf for debugging
 void terminal_printf(const char* format, ...);
 
+// VGA utility functions
+static inline uint8_t vga_entry_color(vga_color fg, vga_color bg) {
+    return fg | bg << 4;
+}
+
 // Test process functions
 void test_process_1(void);
 void test_process_2(void);
