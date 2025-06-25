@@ -53,3 +53,8 @@ void timer_wait(uint32_t ticks) {
         asm volatile ("hlt");  // Halt until next interrupt
     }
 }
+
+// Get uptime in seconds
+uint32_t get_uptime_seconds(void) {
+    return timer_ticks / TIMER_FREQUENCY;
+}

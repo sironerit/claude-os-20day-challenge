@@ -38,5 +38,6 @@ void timer_init(void);
 void timer_handler(void);
 uint32_t timer_get_ticks(void);
 void timer_wait(uint32_t ticks);
+uint32_t get_uptime_seconds(void);
 
 #endif // TIMER_H

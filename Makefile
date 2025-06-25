@@ -14,8 +14,8 @@ ASFLAGS = -f elf32
 # Linker flags
 LDFLAGS = -m elf_i386 -T linker.ld
 
-# Object files (Day 12 - with PMM + Simple Syscalls + MemFS + VMM)
-OBJS = build/entry.o build/kernel.o build/gdt.o build/gdt_flush.o build/idt.o build/idt_flush.o build/isr.o build/isr_asm.o build/pic.o build/io.o build/timer.o build/keyboard.o build/serial.o build/pmm.o build/syscall_simple.o build/memfs_simple.o build/vmm.o build/paging.o
+# Object files (Day 15 - with PMM + Simple Syscalls + MemFS + VMM + Heap + Process + Context Switch)
+OBJS = build/entry.o build/kernel.o build/gdt.o build/gdt_flush.o build/idt.o build/idt_flush.o build/isr.o build/isr_asm.o build/pic.o build/io.o build/timer.o build/keyboard.o build/serial.o build/pmm.o build/syscall_simple.o build/memfs_simple.o build/vmm.o build/paging.o build/heap.o build/process.o build/context_switch.o
 
 # Build directory
 BUILD_DIR = build
