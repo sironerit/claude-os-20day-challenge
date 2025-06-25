@@ -3,11 +3,6 @@
 
 #include "kernel.h"
 
-// VGA helper function
-static inline uint8_t vga_entry_color(vga_color fg, vga_color bg) {
-    return fg | bg << 4;
-}
-
 // Simple string length function
 static size_t simple_strlen(const char* str) {
     size_t len = 0;

@@ -11,11 +11,6 @@ static uint32_t next_file_id = 1;
 static uint32_t current_dir_id = 0;  // Current directory (0 = root)
 static uint32_t time_counter = 1000; // Simple timestamp counter
 
-// VGA helper function
-static inline uint8_t vga_entry_color(vga_color fg, vga_color bg) {
-    return fg | bg << 4;
-}
-
 // String utility functions
 static size_t simple_strlen(const char* str) {
     size_t len = 0;

@@ -6,11 +6,6 @@
 #include "timer.h"
 #include "keyboard.h"
 
-// VGA helper function
-static inline uint8_t vga_entry_color(vga_color fg, vga_color bg) {
-    return fg | bg << 4;
-}
-
 // Register structure for ISR context
 struct registers {
     uint32_t ds;                                     // Data segment selector
