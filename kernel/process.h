@@ -56,6 +56,9 @@ extern int next_pid;
 // Function declarations (enhanced for Day 15)
 void process_init(void);
 int process_create(void (*entry_point)(void), const char* name);
+int process_create_simple(void (*entry_point)(void), const char* name);  // Phase 2
+int process_execute_simple(int pid);  // Phase 3
+int process_run_all_ready(void);  // Phase 4
 void process_switch(void);
 void process_yield(void);
 void process_exit(int exit_code);

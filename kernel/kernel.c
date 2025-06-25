@@ -82,10 +82,6 @@ static char cmd_args[MAX_ARGS][MAX_ARG_LEN];
 static int cmd_argc;
 
 // VGA utility functions
-static inline uint8_t vga_entry_color(vga_color fg, vga_color bg) {
-    return fg | bg << 4;
-}
-
 static inline uint16_t vga_entry(unsigned char uc, uint8_t color) {
     return (uint16_t) uc | (uint16_t) color << 8;
 }
@@ -2252,4 +2248,41 @@ void kernel_main(void) {
             }
         }
     }
+}
+
+// Test process functions for Day 16 multitasking (Phase 1: No yield)
+void test_process_1(void) {
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+    terminal_printf("[PROCESS 1] Started! PID: %d\n", current_process ? current_process->pid : -1);
+    terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+    
+    // Simple work simulation WITHOUT yield
+    for (int i = 0; i < 3; i++) {
+        terminal_printf("[PROCESS 1] Working... iteration %d\n", i);
+        
+        // Simple delay loop (shorter for testing)
+        for (volatile int j = 0; j < 50000; j++);
+    }
+    
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+    terminal_printf("[PROCESS 1] Completed work! Returning...\n");
+    terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+}
+
+void test_process_2(void) {
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK));
+    terminal_printf("[PROCESS 2] Started! PID: %d\n", current_process ? current_process->pid : -1);
+    terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+    
+    // Simple work simulation WITHOUT yield
+    for (int i = 0; i < 2; i++) {
+        terminal_printf("[PROCESS 2] Task %d: Calculating...\n", i);
+        
+        // Simple delay (shorter for testing)
+        for (volatile int j = 0; j < 30000; j++);
+    }
+    
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK));
+    terminal_printf("[PROCESS 2] All tasks completed! Returning...\n");
+    terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
 }
