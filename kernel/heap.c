@@ -11,7 +11,7 @@ static uint32_t heap_start = HEAP_START;
 static uint32_t heap_end = 0;
 static uint32_t heap_max = HEAP_START + HEAP_MAX_SIZE;
 static block_header_t* free_list_head = 0;
-static int heap_initialized = 0;
+int heap_initialized = 0;
 
 // Simple memory functions
 static void* memset(void* ptr, int value, size_t size) {
@@ -140,6 +140,12 @@ int heap_expand(size_t min_size) {
 
 // Initialize heap
 void heap_init(void) {
+    // Check if VMM is initialized
+    if (!current_page_directory) {
+        terminal_writestring("HEAP: ERROR - VMM must be initialized first\n");
+        return;
+    }
+    
     terminal_writestring("HEAP: Initializing kernel heap...\n");
     
     heap_end = heap_start + HEAP_INITIAL_SIZE;

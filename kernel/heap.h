@@ -6,6 +6,11 @@
 
 #include "types.h"
 
+// Page size constant
+#ifndef PAGE_SIZE
+#define PAGE_SIZE 4096
+#endif
+
 // Heap configuration
 #define HEAP_START          0x400000    // 4MB - start of kernel heap
 #define HEAP_INITIAL_SIZE   0x100000    // 1MB - initial heap size
@@ -36,5 +41,8 @@ void heap_dump_blocks(void);
 // Internal heap management
 int heap_expand(size_t min_size);
 void heap_coalesce_free_blocks(void);
+
+// Heap state (read-only access for external code)
+extern int heap_initialized;
 
 #endif // HEAP_H
