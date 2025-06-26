@@ -3,6 +3,7 @@
 
 #include "memfs_simple.h"
 #include "../kernel/kernel.h"
+#include "../kernel/string.h"
 
 // Global file system state (Day 11 Enhanced)
 static memfs_simple_file_t file_table[MEMFS_MAX_FILES];
@@ -207,6 +208,10 @@ int memfs_simple_create(const char* filename) {
     file_table[index].parent_id = current_dir_id;
     file_table[index].created_time = memfs_simple_get_time();
     file_table[index].modified_time = file_table[index].created_time;
+    file_table[index].accessed_time = file_table[index].created_time;
+    file_table[index].permissions = MEMFS_PERM_DEFAULT;
+    file_table[index].flags = 0;
+    simple_strcpy(file_table[index].owner, "system", 16);
     
     simple_memset(file_table[index].data, 0, MEMFS_MAX_FILESIZE);
     
@@ -458,6 +463,10 @@ int memfs_simple_mkdir(const char* dirname) {
     file_table[index].parent_id = current_dir_id;
     file_table[index].created_time = memfs_simple_get_time();
     file_table[index].modified_time = file_table[index].created_time;
+    file_table[index].accessed_time = file_table[index].created_time;
+    file_table[index].permissions = MEMFS_PERM_DEFAULT;
+    file_table[index].flags = 0;
+    simple_strcpy(file_table[index].owner, "system", 16);
     
     simple_memset(file_table[index].data, 0, MEMFS_MAX_FILESIZE);
     
@@ -780,4 +789,132 @@ int memfs_simple_find(const char* name) {
     
     terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
     return found_count > 0 ? MEMFS_SUCCESS : MEMFS_NOT_FOUND;
+}
+
+// Day 18: File attribute management functions
+
+// Change file permissions
+int memfs_simple_chmod(const char* filename, uint16_t permissions) {
+    if (!filename || !memfs_initialized) {
+        return MEMFS_ERROR;
+    }
+    
+    int index = memfs_simple_find_file(filename);
+    if (index < 0) {
+        return MEMFS_NOT_FOUND;
+    }
+    
+    file_table[index].permissions = permissions;
+    file_table[index].modified_time = memfs_simple_get_time();
+    
+    return MEMFS_SUCCESS;
+}
+
+// Change file owner
+int memfs_simple_chown(const char* filename, const char* owner) {
+    if (!filename || !owner || !memfs_initialized) {
+        return MEMFS_ERROR;
+    }
+    
+    int index = memfs_simple_find_file(filename);
+    if (index < 0) {
+        return MEMFS_NOT_FOUND;
+    }
+    
+    // Copy owner name safely
+    int i;
+    for (i = 0; i < 15 && owner[i] != '\0'; i++) {
+        file_table[index].owner[i] = owner[i];
+    }
+    file_table[index].owner[i] = '\0';
+    
+    file_table[index].modified_time = memfs_simple_get_time();
+    
+    return MEMFS_SUCCESS;
+}
+
+// Get file status information
+int memfs_simple_stat(const char* filename, memfs_simple_file_t* stat_info) {
+    if (!filename || !stat_info || !memfs_initialized) {
+        return MEMFS_ERROR;
+    }
+    
+    int index = memfs_simple_find_file(filename);
+    if (index < 0) {
+        return MEMFS_NOT_FOUND;
+    }
+    
+    // Copy file information
+    *stat_info = file_table[index];
+    
+    return MEMFS_SUCCESS;
+}
+
+// Format permissions as rwx string
+void memfs_simple_format_permissions(uint16_t permissions, char* buffer) {
+    if (!buffer) return;
+    
+    buffer[0] = (permissions & MEMFS_PERM_READ) ? 'r' : '-';
+    buffer[1] = (permissions & MEMFS_PERM_WRITE) ? 'w' : '-';
+    buffer[2] = (permissions & MEMFS_PERM_EXEC) ? 'x' : '-';
+    buffer[3] = '\0';
+}
+
+// Show detailed file information
+void memfs_simple_show_file_info(const char* filename) {
+    if (!filename || !memfs_initialized) {
+        terminal_writestring("Error: Invalid filename or filesystem not initialized\n");
+        return;
+    }
+    
+    int index = memfs_simple_find_file(filename);
+    if (index < 0) {
+        terminal_writestring("Error: File not found\n");
+        return;
+    }
+    
+    memfs_simple_file_t* file = &file_table[index];
+    
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+    terminal_writestring("File Information:\n");
+    terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+    
+    // Name and type
+    terminal_writestring("  Name: ");
+    terminal_writestring(file->name);
+    terminal_writestring("\n  Type: ");
+    terminal_writestring(file->type == MEMFS_TYPE_FILE ? "File" : "Directory");
+    terminal_writestring("\n");
+    
+    // Size
+    terminal_writestring("  Size: ");
+    char size_str[16];
+    itoa((int)file->size, size_str, 10);
+    terminal_writestring(size_str);
+    terminal_writestring(" bytes\n");
+    
+    // Permissions
+    terminal_writestring("  Permissions: ");
+    char perm_str[4];
+    memfs_simple_format_permissions(file->permissions, perm_str);
+    terminal_writestring(perm_str);
+    terminal_writestring("\n");
+    
+    // Owner
+    terminal_writestring("  Owner: ");
+    terminal_writestring(file->owner[0] ? file->owner : "system");
+    terminal_writestring("\n");
+    
+    // Timestamps
+    char time_str[8];
+    terminal_writestring("  Created: ");
+    memfs_simple_format_time(file->created_time, time_str, sizeof(time_str));
+    terminal_writestring(time_str);
+    terminal_writestring("\n  Modified: ");
+    memfs_simple_format_time(file->modified_time, time_str, sizeof(time_str));
+    terminal_writestring(time_str);
+    terminal_writestring("\n  Accessed: ");
+    memfs_simple_format_time(file->accessed_time, time_str, sizeof(time_str));
+    terminal_writestring(time_str);
+    terminal_writestring("\n");
 }

@@ -1057,6 +1057,16 @@ void shell_process_command(const char* cmd) {
         terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
         terminal_writestring("  proc <cmd> - Process management commands\n");
         terminal_writestring("  ps       - List all processes (alias)\n");
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK));
+        terminal_writestring("Day 17 IPC & Process Synchronization:\n");
+        terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+        terminal_writestring("  ipc <cmd> - Inter-process communication\n");
+        terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
+        terminal_writestring("Day 18 Enhanced File System:\n");
+        terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+        terminal_writestring("  stat <file> - Show detailed file information\n");
+        terminal_writestring("  chmod <perm> <file> - Change file permissions\n");
+        terminal_writestring("  chown <owner> <file> - Change file owner\n");
         terminal_writestring("\n");
         terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
         terminal_writestring("Navigation & Features:\n");
@@ -1419,6 +1429,59 @@ void shell_process_command(const char* cmd) {
             terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
         } else {
             memfs_simple_find(cmd_args[1]);
+        }
+    } else if (shell_strcmp(cmd_args[0], "stat") == 0) {
+        if (cmd_argc < 2) {
+            terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
+            terminal_writestring("Usage: stat <filename>\n");
+            terminal_writestring("Show detailed file information\n");
+            terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+        } else {
+            memfs_simple_show_file_info(cmd_args[1]);
+        }
+    } else if (shell_strcmp(cmd_args[0], "chmod") == 0) {
+        if (cmd_argc < 3) {
+            terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
+            terminal_writestring("Usage: chmod <permissions> <filename>\n");
+            terminal_writestring("Permissions: 0-7 (4=read, 2=write, 1=execute)\n");
+            terminal_writestring("Example: chmod 6 file.txt (rw-)\n");
+            terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+        } else {
+            int perms = atoi(cmd_args[1]);
+            if (perms >= 0 && perms <= 7) {
+                int result = memfs_simple_chmod(cmd_args[2], (uint16_t)perms);
+                if (result == MEMFS_SUCCESS) {
+                    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+                    terminal_writestring("Permissions changed successfully\n");
+                    terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+                } else {
+                    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+                    terminal_writestring("Error: Could not change permissions\n");
+                    terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+                }
+            } else {
+                terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+                terminal_writestring("Error: Invalid permissions (0-7)\n");
+                terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+            }
+        }
+    } else if (shell_strcmp(cmd_args[0], "chown") == 0) {
+        if (cmd_argc < 3) {
+            terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
+            terminal_writestring("Usage: chown <owner> <filename>\n");
+            terminal_writestring("Example: chown alice file.txt\n");
+            terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+        } else {
+            int result = memfs_simple_chown(cmd_args[2], cmd_args[1]);
+            if (result == MEMFS_SUCCESS) {
+                terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+                terminal_writestring("Owner changed successfully\n");
+                terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+            } else {
+                terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+                terminal_writestring("Error: Could not change owner\n");
+                terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+            }
         }
     } else if (shell_strcmp(cmd_args[0], "history") == 0) {
         terminal_setcolor(vga_entry_color(VGA_COLOR_CYAN, VGA_COLOR_BLACK));
@@ -2142,10 +2205,10 @@ void kernel_main(void) {
     
     // Display welcome message
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
-    terminal_writestring("ClaudeOS Day 17 - IPC & Process Synchronization\n");
-    terminal_writestring("===============================================\n");
+    terminal_writestring("ClaudeOS Day 18 - Enhanced File System + System Monitoring\n");
+    terminal_writestring("==========================================================\n");
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
-    terminal_writestring("Enhanced: VMM + Heap + Process Management + IPC + Semaphores\n\n");
+    terminal_writestring("Enhanced: VMM + Heap + Process + IPC + Advanced FS + Monitoring\n\n");
     
     // Initialize basic systems
     terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));

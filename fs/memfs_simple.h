@@ -9,12 +9,19 @@
 // File system constants (Day 11 Phase 2 Enhanced)
 #define MEMFS_MAX_FILES 32          // Maximum number of files/directories
 #define MEMFS_MAX_FILENAME 32       // Maximum filename length
-#define MEMFS_MAX_FILESIZE 4096     // Maximum file size (4KB for Phase 2)
+#define MEMFS_MAX_FILESIZE 16384    // Maximum file size (16KB for Day 18)
 #define MEMFS_MAX_PATH 128          // Maximum path length
 
 // File types (Day 11)
 #define MEMFS_TYPE_FILE     1
 #define MEMFS_TYPE_DIR      2
+
+// File permissions (Day 18)
+#define MEMFS_PERM_READ     0x004   // Read permission
+#define MEMFS_PERM_WRITE    0x002   // Write permission
+#define MEMFS_PERM_EXEC     0x001   // Execute permission
+#define MEMFS_PERM_ALL      0x007   // All permissions (rwx)
+#define MEMFS_PERM_DEFAULT  0x006   // Default permissions (rw-)
 
 // Error codes
 #define MEMFS_SUCCESS       0
@@ -25,7 +32,7 @@
 #define MEMFS_NOT_DIR      -5
 #define MEMFS_IS_DIR       -6
 
-// File entry structure (Day 11 Enhanced)
+// File entry structure (Day 18 Enhanced)
 typedef struct memfs_simple_file {
     char name[MEMFS_MAX_FILENAME];      // File/directory name
     uint8_t type;                       // File type (MEMFS_TYPE_FILE or MEMFS_TYPE_DIR)
@@ -36,6 +43,10 @@ typedef struct memfs_simple_file {
     uint32_t parent_id;                 // Parent directory ID (0 = root)
     uint32_t created_time;              // Creation timestamp
     uint32_t modified_time;             // Last modification timestamp
+    uint32_t accessed_time;             // Last access timestamp
+    uint16_t permissions;               // File permissions (rwx format)
+    uint16_t flags;                     // Additional file flags
+    char owner[16];                     // File owner name
 } memfs_simple_file_t;
 
 // File system statistics
@@ -78,6 +89,13 @@ int memfs_simple_write(const char* filename, const char* content);
 void memfs_simple_list_files(void);
 void memfs_simple_list_detailed(void);  // Day 11: ls -l equivalent
 void memfs_simple_get_stats(memfs_simple_stats_t* stats);
+
+// Day 18: File attribute management
+int memfs_simple_chmod(const char* filename, uint16_t permissions);
+int memfs_simple_chown(const char* filename, const char* owner);
+int memfs_simple_stat(const char* filename, memfs_simple_file_t* stat_info);
+void memfs_simple_format_permissions(uint16_t permissions, char* buffer);
+void memfs_simple_show_file_info(const char* filename);
 
 // Internal functions
 int memfs_simple_find_file(const char* filename);
