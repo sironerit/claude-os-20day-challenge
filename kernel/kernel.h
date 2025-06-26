@@ -48,6 +48,17 @@ static inline uint8_t vga_entry_color(vga_color fg, vga_color bg) {
 
 // Test process functions
 void test_process_1(void);
+
+// String utility functions for IPC
+int strcmp(const char* str1, const char* str2);
+int atoi(const char* str);
+
+// Test process functions for multitasking
 void test_process_2(void);
+void test_process_ipc_sender(void);
+void test_process_ipc_receiver(void);
+void test_process_producer(void);
+void test_process_consumer(void);
+void test_process_simple(void);
 
 #endif // KERNEL_H

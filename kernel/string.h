@@ -22,5 +22,6 @@ char* strchr(const char* str, int character);
 
 // Number conversion
 char* itoa(int value, char* str, int base);
+int atoi(const char* str);
 
 #endif // STRING_H

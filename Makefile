@@ -14,8 +14,8 @@ ASFLAGS = -f elf32
 # Linker flags
 LDFLAGS = -m elf_i386 -T linker.ld
 
-# Object files (Day 15 - with PMM + Simple Syscalls + MemFS + VMM + Heap + Process + Context Switch)
-OBJS = build/entry.o build/kernel.o build/gdt.o build/gdt_flush.o build/idt.o build/idt_flush.o build/isr.o build/isr_asm.o build/pic.o build/io.o build/timer.o build/keyboard.o build/serial.o build/pmm.o build/syscall_simple.o build/memfs_simple.o build/vmm.o build/paging.o build/heap.o build/process.o build/context_switch.o
+# Object files (Day 17 - with IPC + String Utils + Test Processes)
+OBJS = build/entry.o build/kernel.o build/gdt.o build/gdt_flush.o build/idt.o build/idt_flush.o build/isr.o build/isr_asm.o build/pic.o build/io.o build/timer.o build/keyboard.o build/serial.o build/pmm.o build/syscall_simple.o build/memfs_simple.o build/vmm.o build/paging.o build/heap.o build/process.o build/context_switch.o build/ipc.o build/string.o build/test_processes.o
 
 # Build directory
 BUILD_DIR = build
@@ -126,6 +126,14 @@ $(BUILD_DIR)/memfs.o: fs/memfs.c | $(BUILD_DIR)
 
 # Compile String utilities C code
 $(BUILD_DIR)/string.o: kernel/string.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $< -o $@
+
+# Compile IPC C code
+$(BUILD_DIR)/ipc.o: kernel/ipc.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $< -o $@
+
+# Compile Test Processes C code
+$(BUILD_DIR)/test_processes.o: kernel/test_processes.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) $< -o $@
 
 # Compile Shell C code

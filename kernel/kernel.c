@@ -14,6 +14,8 @@
 #include "process.h"
 #include "syscall_simple.h"
 #include "../fs/memfs_simple.h"
+#include "ipc.h"
+#include "string.h"
 
 // VGA Text Mode Constants
 #define VGA_WIDTH 80
@@ -1942,6 +1944,9 @@ void shell_process_command(const char* cmd) {
         // Alias for proc list
         process_list();
         
+    } else if (shell_strcmp(cmd_args[0], "ipc") == 0) {
+        ipc_command_handler(cmd_argc, cmd_args);
+        
     } else if (shell_strcmp(cmd_args[0], "vmm") == 0) {
         if (cmd_argc > 1 && shell_strcmp(cmd_args[1], "init") == 0) {
             terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
@@ -2137,10 +2142,10 @@ void kernel_main(void) {
     
     // Display welcome message
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
-    terminal_writestring("ClaudeOS Day 15 - Process Management System\n");
-    terminal_writestring("===========================================\n");
+    terminal_writestring("ClaudeOS Day 17 - IPC & Process Synchronization\n");
+    terminal_writestring("===============================================\n");
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
-    terminal_writestring("Enhanced: VMM + Heap + Testing + Process Management + Advanced Features\n\n");
+    terminal_writestring("Enhanced: VMM + Heap + Process Management + IPC + Semaphores\n\n");
     
     // Initialize basic systems
     terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
