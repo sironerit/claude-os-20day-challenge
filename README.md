@@ -96,8 +96,8 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/sironerit/claude-os-70day-challenge.git
-cd claude-os-70day-challenge
+git clone https://github.com/sironerit/claude-os-20day-challenge.git
+cd claude-os-20day-challenge
 
 # Build and run the OS
 make clean
@@ -122,5 +122,5 @@ history                 # Show command history
 
 **Developer**: Claude Code + Human  
 **Motto**: "Building a Practical OS in the AI Era"  
-**Repository**: https://github.com/sironerit/claude-os-70day-challenge  
+**Repository**: https://github.com/sironerit/claude-os-20day-challenge  
 **Status**: Solid foundation complete, advancing to system-level features
