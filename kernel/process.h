@@ -73,6 +73,9 @@ void process_cleanup_terminated(void);
 // Process management commands
 void process_command_handler(int argc, char argv[][64]);
 
+// Day 19: System monitoring functions
+int process_get_count(void);
+
 // Assembly function (to be implemented)
 extern void switch_context(cpu_context_t* old_context, cpu_context_t* new_context);
 

@@ -1018,3 +1018,17 @@ void process_command_handler(int argc, char argv[][64]) {
         terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
     }
 }
+
+// Day 19: Get total number of active processes
+int process_get_count(void) {
+    int count = 0;
+    for (int i = 0; i < MAX_PROCESSES; i++) {
+        if (process_table[i].pid != INVALID_PID && 
+            (process_table[i].state == PROCESS_READY || 
+             process_table[i].state == PROCESS_RUNNING || 
+             process_table[i].state == PROCESS_BLOCKED)) {
+            count++;
+        }
+    }
+    return count;
+}
